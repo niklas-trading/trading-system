@@ -1,22 +1,16 @@
 ---
 name: Weekly Goal
-about: Weekly SMART goal
-title: "Week XX – <Title> (YYYY-MM-DD → YYYY-MM-DD)"
-labels: []
+about: One SMART trading/system week
+labels: [week]
 ---
 
 ## Goal (SMART)
-<!-- Specific, Measurable, Achievable, Relevant, Time-bound -->
+
+## Context
+
+## Why this week matters
 
 ## Tasks
-- [ ] Task 1
-- [ ] Task 2
-
-## Deliverables
-- [ ] Document
-- [ ] Code
-- [ ] Report
+<!-- Sub-issues will be linked here -->
 
 ## Acceptance Criteria
-- [ ] Criteria 1
-- [ ] Criteria 2
