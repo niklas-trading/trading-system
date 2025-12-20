@@ -1,10 +1,15 @@
-name: Sync Year Plan
+name: Sync Year Plan to Project
 
 on:
   push:
     paths:
       - docs/year-plan.md
   workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  projects: write
 
 jobs:
   sync:
@@ -17,14 +22,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run sync script
+      - name: Sync year plan to GitHub Project
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          PROJECT_ID: dummy-for-now
+          ORG: niklas-trading
+          PROJECT_NUMBER: 1
         run: python scripts/sync_plan.py
