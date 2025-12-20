@@ -1,0 +1,25 @@
+query {
+  organization(login: "niklas-trading") {
+    projectV2(number: 1) {
+      id
+      title
+      fields(first: 20) {
+        nodes {
+          ... on ProjectV2Field {
+            id
+            name
+            dataType
+          }
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+            options {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+}
