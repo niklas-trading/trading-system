@@ -1,35 +1,33 @@
-name: Sync Year Plan to Project
+name: Sync Year Plan
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - docs/year-plan.md
-  workflow_dispatch:
 
 permissions:
   contents: read
   issues: write
+  projects: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install requests
+      - run: pip install requests
 
       - name: Sync year plan to GitHub Project
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          ORG: niklas-trading
-          PROJECT_NUMBER: 1
+          OWNER: niklas-trading
+          REPO_NAME: trading-system
+          PROJECT_NUMBER: "3"
         run: python scripts/sync_plan.py
