@@ -1,0 +1,30 @@
+name: Sync Year Plan
+
+on:
+  push:
+    paths:
+      - docs/year-plan.md
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run sync script
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO: ${{ github.repository }}
+          PROJECT_ID: dummy-for-now
+        run: python scripts/sync_plan.py
