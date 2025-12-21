@@ -14,6 +14,12 @@ jobs:
   sync:
     runs-on: ubuntu-latest
 
+    env:
+      GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}
+      ORG: niklas-trading
+      REPO: trading-system
+      PROJECT_NUMBER: "3"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -37,8 +43,3 @@ jobs:
 
       - name: Update status by date
         run: python scripts/40_update_status.py
-        env:
-          GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}
-          ORG: niklas-trading
-          REPO: trading-system
-          PROJECT_NUMBER: "3"
