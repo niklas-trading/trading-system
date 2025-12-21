@@ -4,9 +4,9 @@ import requests
 from datetime import datetime
 
 TOKEN = os.environ["GITHUB_TOKEN"]
-OWNER = os.environ["OWNER"]        # niklas-trading
-REPO = os.environ["REPO_NAME"]     # trading-system
+ORG = os.environ["ORG"]
 PROJECT_NUMBER = int(os.environ["PROJECT_NUMBER"])
+REPO = os.environ["REPO"]
 
 API_URL = "https://api.github.com/graphql"
 HEADERS = {
@@ -15,25 +15,25 @@ HEADERS = {
 }
 
 def graphql(query, variables=None):
-    resp = requests.post(
+    r = requests.post(
         API_URL,
         headers=HEADERS,
         json={"query": query, "variables": variables or {}},
     )
-    resp.raise_for_status()
-    data = resp.json()
+    r.raise_for_status()
+    data = r.json()
     if "errors" in data:
         raise RuntimeError(data["errors"])
     return data["data"]
 
-# 1. Repository Project holen
+# 1. Org Project holen
 data = graphql(
     """
-    query($owner: String!, $repo: String!, $number: Int!) {
-      repository(owner: $owner, name: $repo) {
+    query($org: String!, $number: Int!) {
+      organization(login: $org) {
         projectV2(number: $number) {
           id
-          fields(first: 20) {
+          fields(first: 30) {
             nodes {
               ... on ProjectV2Field {
                 id
@@ -53,23 +53,23 @@ data = graphql(
       }
     }
     """,
-    {"owner": OWNER, "repo": REPO, "number": PROJECT_NUMBER},
+    {"org": ORG, "number": PROJECT_NUMBER},
 )
 
-project = data["repository"]["projectV2"]
+project = data["organization"]["projectV2"]
 if project is None:
-    raise RuntimeError("Project not found. Check PROJECT_NUMBER.")
+    raise RuntimeError("Project not found – check PROJECT_NUMBER and PAT permissions")
 
 PROJECT_ID = project["id"]
 
 field_ids = {}
 status_options = {}
 
-for field in project["fields"]["nodes"]:
-    if field["name"] in ("Start", "End", "Status"):
-        field_ids[field["name"]] = field["id"]
-        if field["name"] == "Status":
-            for opt in field["options"]:
+for f in project["fields"]["nodes"]:
+    if f["name"] in ("Start", "End", "Status"):
+        field_ids[f["name"]] = f["id"]
+        if f["name"] == "Status":
+            for opt in f["options"]:
                 status_options[opt["name"]] = opt["id"]
 
 # 2. Jahresplan lesen
@@ -84,42 +84,30 @@ for block in weeks:
 
     title = block.splitlines()[0].replace("## ", "").strip()
 
-    date_match = re.search(
-        r"\*\*Zeitraum:\*\*\s*([0-9.]+)\s*[–-]\s*([0-9.]+)", block
-    )
-    if not date_match:
+    m = re.search(r"\*\*Zeitraum:\*\*\s*([0-9.]+)\s*[–-]\s*([0-9.]+)", block)
+    if not m:
         continue
 
-    start = datetime.strptime(date_match.group(1), "%d.%m.%Y").date().isoformat()
-    end = datetime.strptime(date_match.group(2), "%d.%m.%Y").date().isoformat()
+    start = datetime.strptime(m.group(1), "%d.%m.%Y").date().isoformat()
+    end = datetime.strptime(m.group(2), "%d.%m.%Y").date().isoformat()
 
     # 3. Issue erstellen
-    issue_resp = requests.post(
-        f"https://api.github.com/repos/{OWNER}/{REPO}/issues",
-        headers={
-            "Authorization": f"Bearer {TOKEN}",
-            "Accept": "application/vnd.github+json",
-        },
-        json={
-            "title": title,
-            "body": block,
-            "labels": ["week"],
-        },
-    )
-    issue_resp.raise_for_status()
-    issue = issue_resp.json()
+    issue = requests.post(
+        f"https://api.github.com/repos/{ORG}/{REPO}/issues",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        json={"title": title, "body": block, "labels": ["week"]},
+    ).json()
+
     content_id = issue["node_id"]
 
-    # 4. Issue dem Project hinzufügen
+    # 4. Issue ins Project
     item_id = graphql(
         """
         mutation($project: ID!, $content: ID!) {
           addProjectV2ItemById(
             input: { projectId: $project, contentId: $content }
           ) {
-            item {
-              id
-            }
+            item { id }
           }
         }
         """,
@@ -138,9 +126,7 @@ for block in weeks:
                   fieldId: $field
                   value: { date: $value }
                 }
-              ) {
-                projectV2Item { id }
-              }
+              ) { projectV2Item { id } }
             }
             """,
             {
@@ -162,9 +148,7 @@ for block in weeks:
               fieldId: $field
               value: { singleSelectOptionId: $option }
             }
-          ) {
-            projectV2Item { id }
-          }
+          ) { projectV2Item { id } }
         }
         """,
         {
@@ -175,4 +159,4 @@ for block in weeks:
         },
     )
 
-    print(f"Synced week: {title}")
+    print(f"Created & synced: {title}")

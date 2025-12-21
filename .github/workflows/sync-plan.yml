@@ -9,7 +9,6 @@ on:
 permissions:
   contents: read
   issues: write
-  projects: write
 
 jobs:
   sync:
@@ -26,8 +25,8 @@ jobs:
 
       - name: Sync year plan to GitHub Project
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OWNER: niklas-trading
-          REPO_NAME: trading-system
+          GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}
+          ORG: niklas-trading
           PROJECT_NUMBER: "3"
+          REPO: trading-system
         run: python scripts/sync_plan.py
