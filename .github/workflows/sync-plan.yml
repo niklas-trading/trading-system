@@ -23,10 +23,22 @@ jobs:
 
       - run: pip install requests
 
-      - name: Sync year plan to GitHub Project
+      - name: Validate environment
+        run: python scripts/00_validate_env.py
+
+      - name: Cleanup duplicate issues
+        run: python scripts/10_cleanup_duplicates.py
+
+      - name: Sync issues from plan
+        run: python scripts/20_sync_issues.py
+
+      - name: Sync project fields (Start / End)
+        run: python scripts/30_sync_project.py
+
+      - name: Update status by date
+        run: python scripts/40_update_status.py
         env:
           GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}
           ORG: niklas-trading
           REPO: trading-system
           PROJECT_NUMBER: "3"
-        run: python scripts/sync_plan.py
