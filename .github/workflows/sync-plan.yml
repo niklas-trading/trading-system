@@ -41,5 +41,4 @@ jobs:
       - name: Sync project fields (Start / End)
         run: python scripts/30_sync_project.py
 
-      - name: Update status by date
-        run: python scripts/40_update_status.py
+
