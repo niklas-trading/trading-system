@@ -5,11 +5,10 @@ from lib.config import PLAN_LABEL, WEEK_LABEL
 
 ORG = os.environ["ORG"]
 PROJECT_NUMBER = int(os.environ["PROJECT_NUMBER"])
-
 today = date.today().isoformat()
 
 # -------------------------------------------------
-# Project + Items laden (korrekte Union-Query!)
+# Project + Fields + Items laden (FIELD-ID BASIERT)
 # -------------------------------------------------
 
 data = graphql(
@@ -18,6 +17,22 @@ data = graphql(
       organization(login: $org) {
         projectV2(number: $number) {
           id
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2Field {
+                id
+                name
+              }
+              ... on ProjectV2SingleSelectField {
+                id
+                name
+                options {
+                  id
+                  name
+                }
+              }
+            }
+          }
           items(first: 100) {
             nodes {
               id
@@ -31,24 +46,15 @@ data = graphql(
               }
               fieldValues(first: 20) {
                 nodes {
+                  __typename
                   ... on ProjectV2ItemFieldDateValue {
                     date
+                    fieldId
                   }
                   ... on ProjectV2ItemFieldSingleSelectValue {
-                    name
+                    optionId
+                    fieldId
                   }
-                }
-              }
-            }
-          }
-          fields(first: 20) {
-            nodes {
-              ... on ProjectV2SingleSelectField {
-                id
-                name
-                options {
-                  id
-                  name
                 }
               }
             }
@@ -63,13 +69,22 @@ data = graphql(
 project = data["organization"]["projectV2"]
 PROJECT_ID = project["id"]
 
-# Status-Feld & Optionen
-status_field = next(
-    f for f in project["fields"]["nodes"] if f["name"] == "Status"
-)
-status_options = {o["name"]: o["id"] for o in status_field["options"]}
+# -------------------------------------------------
+# Feld-IDs auf Namen abbilden
+# -------------------------------------------------
 
-def set_status(item_id, status):
+field_name_by_id = {}
+status_field_id = None
+status_option_by_id = {}
+
+for f in project["fields"]["nodes"]:
+    field_name_by_id[f["id"]] = f["name"]
+    if f["name"] == "Status":
+        status_field_id = f["id"]
+        for opt in f["options"]:
+            status_option_by_id[opt["id"]] = opt["name"]
+
+def set_status(item_id, option_id):
     graphql(
         """
         mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
@@ -88,13 +103,13 @@ def set_status(item_id, status):
         {
             "project": PROJECT_ID,
             "item": item_id,
-            "field": status_field["id"],
-            "option": status_options[status],
+            "field": status_field_id,
+            "option": option_id,
         },
     )
 
 # -------------------------------------------------
-# Status-Logik (nur nach Datum)
+# Status-Logik (rein datumsgesteuert)
 # -------------------------------------------------
 
 for item in project["items"]["nodes"]:
@@ -107,27 +122,37 @@ for item in project["items"]["nodes"]:
 
     start = None
     end = None
-    status = None
+    current_status = None
+    current_status_option_id = None
 
-    # Reihenfolge: DateValues = Start/End, SingleSelect = Status
     for fv in item["fieldValues"]["nodes"]:
-        if "date" in fv and fv["date"]:
-            if not start:
+        field_name = field_name_by_id.get(fv["fieldId"])
+
+        if fv["__typename"] == "ProjectV2ItemFieldDateValue":
+            if field_name == "Start":
                 start = fv["date"]
-            else:
+            elif field_name == "End":
                 end = fv["date"]
-        elif "name" in fv:
-            status = fv["name"]
+
+        elif fv["__typename"] == "ProjectV2ItemFieldSingleSelectValue":
+            if field_name == "Status":
+                current_status_option_id = fv["optionId"]
+                current_status = status_option_by_id.get(fv["optionId"])
 
     # Manuelles In Progress respektieren
-    if status == "In Progress":
+    if current_status == "In Progress":
         continue
 
     if end and end < today:
-        set_status(item["id"], "Done")
+        target = "Done"
     elif start and start <= today <= end:
-        set_status(item["id"], "This Week")
+        target = "This Week"
     else:
-        set_status(item["id"], "Backlog")
+        target = "Backlog"
 
-    print(f"✔ Status updated: {item['content']['title']}")
+    if current_status != target:
+        option_id = next(
+            oid for oid, name in status_option_by_id.items() if name == target
+        )
+        set_status(item["id"], option_id)
+        print(f"✔ Status updated → {target}: {item['content']['title']}")
