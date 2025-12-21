@@ -4,12 +4,14 @@ from lib.github import graphql
 from lib.config import PLAN_LABEL, WEEK_LABEL
 
 ORG = os.environ["ORG"]
-REPO = os.environ["REPO"]
 PROJECT_NUMBER = int(os.environ["PROJECT_NUMBER"])
 
-today = date.today()
+today = date.today().isoformat()
 
-# ---- Project laden
+# -------------------------------------------------
+# Project + Items laden (korrekte Union-Query!)
+# -------------------------------------------------
+
 data = graphql(
     """
     query($org: String!, $number: Int!) {
@@ -22,18 +24,18 @@ data = graphql(
               content {
                 ... on Issue {
                   title
-                  labels(first: 10) { nodes { name } }
+                  labels(first: 10) {
+                    nodes { name }
+                  }
                 }
               }
               fieldValues(first: 20) {
                 nodes {
                   ... on ProjectV2ItemFieldDateValue {
                     date
-                    field { name }
                   }
                   ... on ProjectV2ItemFieldSingleSelectValue {
                     name
-                    field { name }
                   }
                 }
               }
@@ -44,7 +46,10 @@ data = graphql(
               ... on ProjectV2SingleSelectField {
                 id
                 name
-                options { id name }
+                options {
+                  id
+                  name
+                }
               }
             }
           }
@@ -58,6 +63,7 @@ data = graphql(
 project = data["organization"]["projectV2"]
 PROJECT_ID = project["id"]
 
+# Status-Feld & Optionen
 status_field = next(
     f for f in project["fields"]["nodes"] if f["name"] == "Status"
 )
@@ -74,7 +80,9 @@ def set_status(item_id, status):
               fieldId: $field
               value: { singleSelectOptionId: $option }
             }
-          ) { projectV2Item { id } }
+          ) {
+            projectV2Item { id }
+          }
         }
         """,
         {
@@ -85,28 +93,39 @@ def set_status(item_id, status):
         },
     )
 
-# ---- Status berechnen
+# -------------------------------------------------
+# Status-Logik (nur nach Datum)
+# -------------------------------------------------
+
 for item in project["items"]["nodes"]:
+    if not item["content"]:
+        continue
+
     labels = {l["name"] for l in item["content"]["labels"]["nodes"]}
     if not {PLAN_LABEL, WEEK_LABEL}.issubset(labels):
         continue
 
-    start = end = status = None
+    start = None
+    end = None
+    status = None
 
+    # Reihenfolge: DateValues = Start/End, SingleSelect = Status
     for fv in item["fieldValues"]["nodes"]:
-        if fv["field"]["name"] == "Start":
-            start = fv["date"]
-        elif fv["field"]["name"] == "End":
-            end = fv["date"]
-        elif fv["field"]["name"] == "Status":
+        if "date" in fv and fv["date"]:
+            if not start:
+                start = fv["date"]
+            else:
+                end = fv["date"]
+        elif "name" in fv:
             status = fv["name"]
 
+    # Manuelles In Progress respektieren
     if status == "In Progress":
         continue
 
-    if end and end < today.isoformat():
+    if end and end < today:
         set_status(item["id"], "Done")
-    elif start and start <= today.isoformat() <= end:
+    elif start and start <= today <= end:
         set_status(item["id"], "This Week")
     else:
         set_status(item["id"], "Backlog")
