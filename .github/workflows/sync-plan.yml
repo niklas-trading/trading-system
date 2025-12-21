@@ -27,6 +27,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}
           ORG: niklas-trading
-          PROJECT_NUMBER: "3"
           REPO: trading-system
+          PROJECT_NUMBER: "3"
         run: python scripts/sync_plan.py

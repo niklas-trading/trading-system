@@ -1283,4 +1283,3 @@
 
 - Dokument „Year Review 2026" (2–5 Seiten) + Roadmap Q1/2027
 
-
