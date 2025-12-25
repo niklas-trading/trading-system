@@ -44,24 +44,33 @@
 
 **Zeitraum:** 27.12.2025 – 02.01.2026
 
-**Ziel (SMART):** Vollständiger Backtest der Strategie v1.5 inkl. MVP-Backtesting-System
+**Ziel (SMART):** Entwurf, Implementierung und Validierung eines
+**engineering-sauberen MVP-Backtesting-Systems** (Python + Spring Boot + React)
+sowie Full-History-Backtest der Strategie v1.5.
+
+**Engineering-Prinzipien (verbindlich):**
+- Strikte Trennung von **Domain / Application / Infrastructure**
+- Erst **High-Level Design**, dann **Low-Level Design**, erst danach Implementierung
+- Deterministisch, reproduzierbar, testbar
+- Strategie-agnostischer Core (keine Strategie-Logik außerhalb von Adaptern)
 
 **Was:**
-- Full-History-Backtest (Single Strategy v1.5)
-- Aufbau eines minimalen, wiederverwendbaren Backtesting-Systems
-- Definition aller Annahmen (Fees, Slippage, Datenquellen)
-
-**Wie:**
-- Python-basierter Backtest-Runner
-- yfinance-Daten
-- Reproduzierbare Runs
+- Architektur- und Domänen-Design des Backtesting-Systems
+- Implementierung eines Python-basierten Backtest-Cores (MVP)
+- Definition eines versionierten Trading-Log-Schemas
+- Aufbau eines minimalen Orchestrators (Spring Boot)
+- Read-only Analyse-UI (React/Vite)
+- Durchführung eines Full-History-Backtests der Strategie v1.5
 
 **Warum:**
-- Reales Trading erst nach statistischer Validierung
+- Backtests sind Teil der Systemarchitektur, kein Einmalskript
+- Reales Trading erst nach technischer und statistischer Validierung
 
 **Messbares Ergebnis:**
-- Backtest-Report v1.5
 - MVP-Backtesting-System lauffähig
+- Dokumentierte Architektur & Domänenmodelle
+- Backtest-Report v1.5
+
 
 ---
 
