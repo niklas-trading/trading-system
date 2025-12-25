@@ -40,9 +40,34 @@
 
 ---
 
-## Woche 2 – Start reales Swing Trading
+## Woche 2 – Backtesting v1.5 & MVP-Backtesting-System
 
 **Zeitraum:** 27.12.2025 – 02.01.2026
+
+**Ziel (SMART):** Vollständiger Backtest der Strategie v1.5 inkl. MVP-Backtesting-System
+
+**Was:**
+- Full-History-Backtest (Single Strategy v1.5)
+- Aufbau eines minimalen, wiederverwendbaren Backtesting-Systems
+- Definition aller Annahmen (Fees, Slippage, Datenquellen)
+
+**Wie:**
+- Python-basierter Backtest-Runner
+- yfinance-Daten
+- Reproduzierbare Runs
+
+**Warum:**
+- Reales Trading erst nach statistischer Validierung
+
+**Messbares Ergebnis:**
+- Backtest-Report v1.5
+- MVP-Backtesting-System lauffähig
+
+---
+
+## Woche 3 – Start reales Swing Trading
+
+**Zeitraum:** 03.01.2026 – 09.01.2026
 
 **Ziel:** Reales Trading strikt nach Strategie
 
@@ -66,9 +91,10 @@
 
 ---
 
-## Woche 3
 
-**Zeitraum:** 03.01.2026 – 09.01.2026
+## Woche 4
+
+**Zeitraum:** 10.01.2026 – 16.01.2026
 
 **Ziel:** Regelkonformität überprüfen
 
@@ -91,9 +117,10 @@
 
 ---
 
-## Woche 4
 
-**Zeitraum:** 10.01.2026 – 16.01.2026
+## Woche 5
+
+**Zeitraum:** 17.01.2026 – 23.01.2026
 
 **Ziel:** Trading-Log standardisieren
 
@@ -115,9 +142,10 @@
 
 ---
 
-## Woche 5
 
-**Zeitraum:** 17.01.2026 – 23.01.2026
+## Woche 6
+
+**Zeitraum:** 24.01.2026 – 30.01.2026
 
 **Ziel:** Beginn Systematisierung
 
@@ -139,9 +167,10 @@
 
 ---
 
-## Woche 6
 
-**Zeitraum:** 24.01.2026 – 30.01.2026
+## Woche 7
+
+**Zeitraum:** 31.01.2026 – 06.02.2026
 
 **Ziel:** Datenmodell festlegen
 
@@ -163,9 +192,10 @@
 
 ---
 
-## Woche 7
 
-**Zeitraum:** 31.01.2026 – 06.02.2026
+## Woche 8
+
+**Zeitraum:** 07.02.2026 – 13.02.2026
 
 **Ziel:** Trade-Logging automatisieren
 
@@ -187,9 +217,10 @@
 
 ---
 
-## Woche 8
 
-**Zeitraum:** 07.02.2026 – 13.02.2026
+## Woche 9
+
+**Zeitraum:** 14.02.2026 – 20.02.2026
 
 **Ziel:** Multi-Trader-Support
 
@@ -211,9 +242,10 @@
 
 ---
 
-## Woche 9
 
-**Zeitraum:** 14.02.2026 – 20.02.2026
+## Woche 10
+
+**Zeitraum:** 21.02.2026 – 27.02.2026
 
 **Ziel:** Basis-Statistiken
 
@@ -235,9 +267,10 @@
 
 ---
 
-## Woche 10
 
-**Zeitraum:** 21.02.2026 – 27.02.2026
+## Woche 11
+
+**Zeitraum:** 28.02.2026 – 06.03.2026
 
 **Ziel:** Kontext explizit machen
 
@@ -259,9 +292,10 @@
 
 ---
 
-## Woche 11
 
-**Zeitraum:** 28.02.2026 – 06.03.2026
+## Woche 12
+
+**Zeitraum:** 07.03.2026 – 13.03.2026
 
 **Ziel:** Kontext-Tagging
 
@@ -283,9 +317,10 @@
 
 ---
 
-## Woche 12
 
-**Zeitraum:** 07.03.2026 – 13.03.2026
+## Woche 13
+
+**Zeitraum:** 14.03.2026 – 20.03.2026
 
 **Ziel (SMART):** Systematisch messen, wo Trader vom Regelwerk abweichen und warum
 
@@ -310,9 +345,10 @@
 
 ---
 
-## Woche 13
 
-**Zeitraum:** 14.03.2026 – 20.03.2026
+## Woche 14
+
+**Zeitraum:** 21.03.2026 – 27.03.2026
 
 **Ziel (SMART):** Entscheidung, welche Regelteile fix und welche flexibel bleiben
 
@@ -335,9 +371,10 @@
 
 ---
 
-## Woche 14
 
-**Zeitraum:** 21.03.2026 – 27.03.2026
+## Woche 15
+
+**Zeitraum:** 28.03.2026 – 03.04.2026
 
 **Ziel (SMART):** Strategie präzisieren ohne Charakter zu verändern
 
@@ -360,9 +397,10 @@
 
 ---
 
-## Woche 15
 
-**Zeitraum:** 28.03.2026 – 03.04.2026
+## Woche 16
+
+**Zeitraum:** 04.04.2026 – 10.04.2026
 
 **Ziel (SMART):** Formale Beschreibung des Setups für Code-Umsetzung
 
@@ -385,9 +423,10 @@
 
 ---
 
-## Woche 16
 
-**Zeitraum:** 04.04.2026 – 10.04.2026
+## Woche 17
+
+**Zeitraum:** 11.04.2026 – 17.04.2026
 
 **Ziel (SMART):** Implementierung der Setup-Erkennung als Service
 
@@ -409,9 +448,10 @@
 
 ---
 
-## Woche 17
 
-**Zeitraum:** 11.04.2026 – 17.04.2026
+## Woche 18
+
+**Zeitraum:** 18.04.2026 – 24.04.2026
 
 **Ziel (SMART):** Validierung der Signale gegen reale Trades
 
@@ -433,9 +473,10 @@
 
 ---
 
-## Woche 18
 
-**Zeitraum:** 18.04.2026 – 24.04.2026
+## Woche 19
+
+**Zeitraum:** 25.04.2026 – 01.05.2026
 
 **Ziel (SMART):** Kontextfilter ergänzen
 
@@ -457,9 +498,10 @@
 
 ---
 
-## Woche 19
 
-**Zeitraum:** 25.04.2026 – 01.05.2026
+## Woche 20
+
+**Zeitraum:** 02.05.2026 – 08.05.2026
 
 **Ziel (SMART):** Risk-Logik algorithmisieren
 
@@ -481,9 +523,10 @@
 
 ---
 
-## Woche 20
 
-**Zeitraum:** 02.05.2026 – 08.05.2026
+## Woche 21
+
+**Zeitraum:** 09.05.2026 – 15.05.2026
 
 **Ziel (SMART):** Pre-Trade-Checks automatisieren
 
@@ -505,9 +548,10 @@
 
 ---
 
-## Woche 21
 
-**Zeitraum:** 09.05.2026 – 15.05.2026
+## Woche 22
+
+**Zeitraum:** 16.05.2026 – 22.05.2026
 
 **Ziel (SMART):** Alerting produktiv einsetzen
 
@@ -529,9 +573,10 @@
 
 ---
 
-## Woche 22
 
-**Zeitraum:** 16.05.2026 – 22.05.2026
+## Woche 23
+
+**Zeitraum:** 23.05.2026 – 29.05.2026
 
 **Ziel (SMART):** Messung des System-Nutzens
 
@@ -553,9 +598,10 @@
 
 ---
 
-## Woche 23
 
-**Zeitraum:** 23.05.2026 – 29.05.2026
+## Woche 24
+
+**Zeitraum:** 30.05.2026 – 05.06.2026
 
 **Ziel (SMART):** Stabilisierung der Algorithmik
 
@@ -577,9 +623,10 @@
 
 ---
 
-## Woche 24
 
-**Zeitraum:** 30.05.2026 – 05.06.2026
+## Woche 25
+
+**Zeitraum:** 06.06.2026 – 12.06.2026
 
 **Ziel (SMART):** Backtesting-Fähigkeit herstellen
 
@@ -601,9 +648,10 @@
 
 ---
 
-## Woche 25
 
-**Zeitraum:** 06.06.2026 – 12.06.2026
+## Woche 26
+
+**Zeitraum:** 13.06.2026 – 19.06.2026
 
 **Ziel (SMART):** Abgleich Backtest vs. Realität
 
@@ -625,9 +673,10 @@
 
 ---
 
-## Woche 26
 
-**Zeitraum:** 13.06.2026 – 19.06.2026
+## Woche 27
+
+**Zeitraum:** 20.06.2026 – 26.06.2026
 
 **Ziel (SMART):** System als festen Trading-Bestandteil etablieren
 
@@ -649,9 +698,10 @@
 
 ---
 
-## Woche 27
 
-**Zeitraum:** 20.06.2026 – 26.06.2026
+## Woche 28
+
+**Zeitraum:** 27.06.2026 – 03.07.2026
 
 **Ziel (SMART):** Anforderungen für einen rein informations- und empfehlungsbasierten Screener eindeutig festlegen (keine Trade-Vorschläge)
 
@@ -677,9 +727,10 @@
 
 ---
 
-## Woche 28
 
-**Zeitraum:** 27.06.2026 – 03.07.2026
+## Woche 29
+
+**Zeitraum:** 04.07.2026 – 10.07.2026
 
 **Ziel (SMART):** Datenquellen für technische, fundamentale und qualitative Informationen festlegen
 
@@ -705,9 +756,10 @@
 
 ---
 
-## Woche 29
 
-**Zeitraum:** 04.07.2026 – 10.07.2026
+## Woche 30
+
+**Zeitraum:** 11.07.2026 – 17.07.2026
 
 **Ziel (SMART):** Datenmodell für Multi-Source-Informationen entwerfen
 
@@ -730,9 +782,10 @@
 
 ---
 
-## Woche 30
 
-**Zeitraum:** 11.07.2026 – 17.07.2026
+## Woche 31
+
+**Zeitraum:** 18.07.2026 – 24.07.2026
 
 **Ziel (SMART):** Technische Analyse als Informationslayer implementieren
 
@@ -754,9 +807,10 @@
 
 ---
 
-## Woche 31
 
-**Zeitraum:** 18.07.2026 – 24.07.2026
+## Woche 32
+
+**Zeitraum:** 25.07.2026 – 31.07.2026
 
 **Ziel (SMART):** Fundamentalanalyse-Snapshots integrieren
 
@@ -778,9 +832,10 @@
 
 ---
 
-## Woche 32
 
-**Zeitraum:** 25.07.2026 – 31.07.2026
+## Woche 33
+
+**Zeitraum:** 01.08.2026 – 07.08.2026
 
 **Ziel (SMART):** Nachrichten-Ingestion & Klassifikation (ohne Sentiment-KI)
 
@@ -803,9 +858,10 @@
 
 ---
 
-## Woche 33
 
-**Zeitraum:** 01.08.2026 – 07.08.2026
+## Woche 34
+
+**Zeitraum:** 08.08.2026 – 14.08.2026
 
 **Ziel (SMART):** Social-Media-Signale aggregieren (Noise-reduziert)
 
@@ -827,9 +883,10 @@
 
 ---
 
-## Woche 34
 
-**Zeitraum:** 08.08.2026 – 14.08.2026
+## Woche 35
+
+**Zeitraum:** 15.08.2026 – 21.08.2026
 
 **Ziel (SMART):** Interest-Score definieren (keine Trade-Score)
 
@@ -851,9 +908,10 @@
 
 ---
 
-## Woche 35
 
-**Zeitraum:** 15.08.2026 – 21.08.2026
+## Woche 36
+
+**Zeitraum:** 22.08.2026 – 28.08.2026
 
 **Ziel (SMART):** Interest Report („Warum anschauen?“) generieren
 
@@ -875,9 +933,10 @@
 
 ---
 
-## Woche 36
 
-**Zeitraum:** 22.08.2026 – 28.08.2026
+## Woche 37
+
+**Zeitraum:** 29.08.2026 – 04.09.2026
 
 **Ziel (SMART):** Screener-Workflow operationalisieren
 
@@ -899,9 +958,10 @@
 
 ---
 
-## Woche 37
 
-**Zeitraum:** 29.08.2026 – 04.09.2026
+## Woche 38
+
+**Zeitraum:** 05.09.2026 – 11.09.2026
 
 **Ziel (SMART):** Risikoindikatoren explizit darstellen
 
@@ -923,9 +983,10 @@
 
 ---
 
-## Woche 38
 
-**Zeitraum:** 05.09.2026 – 11.09.2026
+## Woche 39
+
+**Zeitraum:** 12.09.2026 – 18.09.2026
 
 **Ziel (SMART):** Menschliche Nutzung des Screeners messen
 
@@ -947,9 +1008,10 @@
 
 ---
 
-## Woche 39
 
-**Zeitraum:** 12.09.2026 – 18.09.2026
+## Woche 40
+
+**Zeitraum:** 19.09.2026 – 25.09.2026
 
 **Ziel (SMART):** Screener-Erkenntnisse mit realen Trades korrelieren
 
@@ -971,9 +1033,10 @@
 
 ---
 
-## Woche 40
 
-**Zeitraum:** 19.09.2026 – 25.09.2026
+## Woche 41
+
+**Zeitraum:** 26.09.2026 – 02.10.2026
 
 **Ziel (SMART):** Schnittstelle Screener → Trading-System definieren (rein informativ)
 
@@ -995,9 +1058,10 @@
 
 ---
 
-## Woche 41
 
-**Zeitraum:** 26.09.2026 – 02.10.2026
+## Woche 42
+
+**Zeitraum:** 03.10.2026 – 09.10.2026
 
 **Ziel (SMART):** Stabilität & Datenlatenz der Informationspipeline prüfen
 
@@ -1019,9 +1083,10 @@
 
 ---
 
-## Woche 42
 
-**Zeitraum:** 03.10.2026 – 09.10.2026
+## Woche 43
+
+**Zeitraum:** 10.10.2026 – 16.10.2026
 
 **Ziel (SMART):** Review & Schärfung der Informationslogik
 
@@ -1044,9 +1109,10 @@
 
 ---
 
-## Woche 43
 
-**Zeitraum:** 10.10.2026 – 16.10.2026
+## Woche 44
+
+**Zeitraum:** 17.10.2026 – 23.10.2026
 
 **Ziel (SMART):** Monitoring/Observability für Trading-System einführen
 
@@ -1068,9 +1134,10 @@
 
 ---
 
-## Woche 44
 
-**Zeitraum:** 17.10.2026 – 23.10.2026
+## Woche 45
+
+**Zeitraum:** 24.10.2026 – 30.10.2026
 
 **Ziel (SMART):** CI/CD erweitern: Testabdeckung und Release-Prozess
 
@@ -1092,9 +1159,10 @@
 
 ---
 
-## Woche 45
 
-**Zeitraum:** 24.10.2026 – 30.10.2026
+## Woche 46
+
+**Zeitraum:** 31.10.2026 – 06.11.2026
 
 **Ziel (SMART):** Screener-UI/Frontend minimal bereitstellen (schnelle Nutzung)
 
@@ -1116,9 +1184,10 @@
 
 ---
 
-## Woche 46
 
-**Zeitraum:** 31.10.2026 – 06.11.2026
+## Woche 47
+
+**Zeitraum:** 07.11.2026 – 13.11.2026
 
 **Ziel (SMART):** „Strategy Hygiene“: Regelkonformität automatisiert messen
 
@@ -1140,9 +1209,10 @@
 
 ---
 
-## Woche 47
 
-**Zeitraum:** 07.11.2026 – 13.11.2026
+## Woche 48
+
+**Zeitraum:** 14.11.2026 – 20.11.2026
 
 **Ziel (SMART):** Risiko-Management auf Portfolioebene (mehrere Trades gleichzeitig)
 
@@ -1164,9 +1234,10 @@
 
 ---
 
-## Woche 48
 
-**Zeitraum:** 14.11.2026 – 20.11.2026
+## Woche 49
+
+**Zeitraum:** 21.11.2026 – 27.11.2026
 
 **Ziel (SMART):** Backtesting v1.1: Screener + Setup + Risk als End-to-End-Simulation
 
@@ -1188,9 +1259,10 @@
 
 ---
 
-## Woche 49
 
-**Zeitraum:** 21.11.2026 – 27.11.2026
+## Woche 50
+
+**Zeitraum:** 28.11.2026 – 04.12.2026
 
 **Ziel (SMART):** Dokumentation als Produkt: Architektur, Datenmodell, Betrieb
 
@@ -1212,9 +1284,10 @@
 
 ---
 
-## Woche 50
 
-**Zeitraum:** 28.11.2026 – 04.12.2026
+## Woche 51
+
+**Zeitraum:** 05.12.2026 – 11.12.2026
 
 **Ziel (SMART):** Strategischer Review: Was bleibt manuell, was wird algorithmisch?
 
@@ -1236,9 +1309,10 @@
 
 ---
 
-## Woche 51
 
-**Zeitraum:** 05.12.2026 – 11.12.2026
+## Woche 52
+
+**Zeitraum:** 12.12.2026 – 18.12.2026
 
 **Ziel (SMART):** Stabilitätswoche: technische Schulden reduzieren
 
@@ -1260,9 +1334,10 @@
 
 ---
 
-## Woche 52
 
-**Zeitraum:** 12.12.2026 – 18.12.2026
+## Woche 53
+
+**Zeitraum:** 19.12.2026 – 25.12.2026
 
 **Ziel (SMART):** Jahresabschluss: harte Kennzahlen + nächste Roadmap
 

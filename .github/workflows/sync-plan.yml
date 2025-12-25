@@ -19,6 +19,8 @@ jobs:
       ORG: niklas-trading
       REPO: trading-system
       PROJECT_NUMBER: "3"
+      # Optional safety switch (default: false):
+      # CLOSE_REMOVED: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -32,13 +34,11 @@ jobs:
       - name: Validate environment
         run: python scripts/00_validate_env.py
 
-      - name: Cleanup duplicate issues
+      - name: Cleanup duplicate issues (plan-id based)
         run: python scripts/10_cleanup_duplicates.py
 
-      - name: Sync issues from plan
+      - name: Sync issues from plan (migrationsafe)
         run: python scripts/20_sync_issues.py
 
-      - name: Sync project fields (Start / End)
+      - name: Sync project fields (Start / End) (plan-id based)
         run: python scripts/30_sync_project.py
-
-
