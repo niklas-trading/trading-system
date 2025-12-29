@@ -1,0 +1,44 @@
+name: Sync Year Plan
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - docs/year-plan.md
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}
+      ORG: niklas-trading
+      REPO: trading-system
+      PROJECT_NUMBER: "3"
+      # Optional safety switch (default: false):
+      # CLOSE_REMOVED: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install requests
+
+      - name: Validate environment
+        run: python scripts/00_validate_env.py
+
+      - name: Cleanup duplicate issues (plan-id based)
+        run: python scripts/10_cleanup_duplicates.py
+
+      - name: Sync issues from plan (migrationsafe)
+        run: python scripts/20_sync_issues.py
+
+      - name: Sync project fields (Start / End) (plan-id based)
+        run: python scripts/30_sync_project.py
