@@ -1,0 +1,51 @@
+<mxfile host="app.diagrams.net" modified="2025-12-28T12:00:00.000Z" agent="ChatGPT" version="22.1.0">
+  <diagram name="MarketDataLoaderDataScheme">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="instrument" value="instrument&#10;-------------------------&#10;id (PK)&#10;symbol (UNIQUE)&#10;name&#10;exchange&#10;currency&#10;timezone&#10;created_at"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;"
+          vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="260" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="price_data" value="price_data (yfinance.download)&#10;-------------------------&#10;instrument_id (FK)&#10;timestamp (PK)&#10;interval (PK)&#10;open&#10;high&#10;low&#10;close&#10;adj_close&#10;volume&#10;dividends&#10;stock_splits"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;"
+          vertex="1" parent="1">
+          <mxGeometry x="360" y="40" width="320" height="260" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="market_status" value="market_status (yfinance.Market.status)&#10;-------------------------&#10;market_code (PK)&#10;retrieval_time (PK)&#10;timezone&#10;current_time&#10;market_state&#10;next_open&#10;next_close&#10;is_open&#10;regular_start&#10;regular_end&#10;pre_market_start&#10;post_market_end"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;"
+          vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="340" height="280" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="market_summary" value="market_summary (yfinance.Market.summary)&#10;-------------------------&#10;market_code (PK)&#10;exchange (PK)&#10;retrieval_time (PK)&#10;advancing_issues&#10;declining_issues&#10;unchanged_issues&#10;total_volume&#10;advance_decline_ratio"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;"
+          vertex="1" parent="1">
+          <mxGeometry x="420" y="330" width="320" height="240" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="calendar_event" value="calendar_event (yfinance.Calendars)&#10;-------------------------&#10;id (PK)&#10;event_type&#10;event_date&#10;symbol&#10;company_name&#10;details (JSONB)&#10;retrieval_time"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;"
+          vertex="1" parent="1">
+          <mxGeometry x="780" y="160" width="320" height="240" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r1" style="endArrow=block;html=1;" edge="1" parent="1"
+          source="price_data" target="instrument">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r2" style="endArrow=block;html=1;" edge="1" parent="1"
+          source="calendar_event" target="instrument">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

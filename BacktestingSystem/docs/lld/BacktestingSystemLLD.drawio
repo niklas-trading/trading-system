@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" version="29.2.9">
   <diagram name="Seite-1" id="XK5KOqLjb4XFC-x7BS4t">
-    <mxGraphModel dx="4860" dy="3216" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="3737" dy="2098" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -166,6 +166,27 @@
         </mxCell>
         <mxCell id="N2QRQPz4PgF7LHUPB8zK-46" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;h1&gt;Python&lt;/h1&gt;" vertex="1">
           <mxGeometry height="30" width="60" x="1080" y="-80" as="geometry" />
+        </mxCell>
+        <mxCell id="Ap7I-0-CL7C4BgMBM_Uv-13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="instrument&#xa;-------------------------&#xa;id (PK)&#xa;symbol (UNIQUE)&#xa;name&#xa;exchange&#xa;currency&#xa;timezone&#xa;created_at" vertex="1">
+          <mxGeometry height="200" width="260" x="-1180" y="-139" as="geometry" />
+        </mxCell>
+        <mxCell id="Ap7I-0-CL7C4BgMBM_Uv-14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="price_data (yfinance.download)&#xa;-------------------------&#xa;instrument_id (FK)&#xa;timestamp (PK)&#xa;interval (PK)&#xa;open&#xa;high&#xa;low&#xa;close&#xa;adj_close&#xa;volume&#xa;dividends&#xa;stock_splits" vertex="1">
+          <mxGeometry height="260" width="320" x="-870" y="-290" as="geometry" />
+        </mxCell>
+        <mxCell id="Ap7I-0-CL7C4BgMBM_Uv-15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="market_status (yfinance.Market.status)&#xa;-------------------------&#xa;market_code (PK)&#xa;retrieval_time (PK)&#xa;timezone&#xa;current_time&#xa;market_state&#xa;next_open&#xa;next_close&#xa;is_open&#xa;regular_start&#xa;regular_end&#xa;pre_market_start&#xa;post_market_end" vertex="1">
+          <mxGeometry height="280" width="340" x="-1180" y="141" as="geometry" />
+        </mxCell>
+        <mxCell id="Ap7I-0-CL7C4BgMBM_Uv-16" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="market_summary (yfinance.Market.summary)&#xa;-------------------------&#xa;market_code (PK)&#xa;exchange (PK)&#xa;retrieval_time (PK)&#xa;advancing_issues&#xa;declining_issues&#xa;unchanged_issues&#xa;total_volume&#xa;advance_decline_ratio" vertex="1">
+          <mxGeometry height="240" width="320" x="-800" y="151" as="geometry" />
+        </mxCell>
+        <mxCell id="Ap7I-0-CL7C4BgMBM_Uv-17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="calendar_event (yfinance.Calendars)&#xa;-------------------------&#xa;id (PK)&#xa;event_type&#xa;event_date&#xa;symbol&#xa;company_name&#xa;details (JSONB)&#xa;retrieval_time" vertex="1">
+          <mxGeometry height="240" width="320" x="-440" y="-19" as="geometry" />
+        </mxCell>
+        <mxCell id="Ap7I-0-CL7C4BgMBM_Uv-18" edge="1" parent="1" source="Ap7I-0-CL7C4BgMBM_Uv-14" style="endArrow=block;html=1;" target="Ap7I-0-CL7C4BgMBM_Uv-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Ap7I-0-CL7C4BgMBM_Uv-19" edge="1" parent="1" source="Ap7I-0-CL7C4BgMBM_Uv-17" style="endArrow=block;html=1;" target="Ap7I-0-CL7C4BgMBM_Uv-13">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
