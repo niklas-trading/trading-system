@@ -9,4 +9,6 @@ uvicorn market_data_loader:app --reload
 ````
 ````psh
 docker run --name trading -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=trading -p 5432:5432 -d postgres
+
 ````
+
