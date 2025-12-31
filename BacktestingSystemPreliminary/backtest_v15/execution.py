@@ -1,9 +1,12 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 import random
 import pandas as pd
 
 from .config import SlippageConfig, RiskConfig
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 from .types import Position
 from .features import FeatureSnapshot
 
@@ -15,16 +18,21 @@ class SlippageModel:
         self.rng = random.Random(self.cfg.seed)
 
     def apply(self, price: float, atr: float|None, side: str) -> float:
+        log_kv(logger, logging.DEBUG, "SLIPPAGE_APPLY", price=price, atr=atr, side=side)
         if atr is None or atr <= 0:
+            log_kv(logger, logging.DEBUG, "SLIPPAGE_NONE")
             return price
         slip = self.rng.uniform(0.0, self.cfg.max_atr_frac * atr)
-        return price + slip if side.lower() == "buy" else price - slip
+        fill = price + slip if side.lower() == "buy" else price - slip
+        log_kv(logger, logging.DEBUG, "SLIPPAGE_DONE", slip=slip, fill=fill)
+        return fill
 
 @dataclass
 class RiskEngine:
     cfg: RiskConfig
 
     def risk_pct(self, equity: float, equity_high: float, dd: float, regime: str, catalyst_class: str) -> float:
+        log_kv(logger, logging.DEBUG, "RISK_PCT", equity=equity, equity_high=equity_high, dd=dd, regime=regime, catalyst_class=catalyst_class)
         # factors per v1.5
         regime_factor = {"Defensiv": 0.5, "Neutral": 1.0, "Expansion": 1.5}.get(regime, 1.0)
         qual_factor = {"K2": 1.0, "K1": 1.2}.get(catalyst_class, 1.0)
@@ -55,6 +63,7 @@ class RiskEngine:
 
     @staticmethod
     def position_size(equity: float, risk_pct: float, entry: float, stop: float) -> float:
+        log_kv(logger, logging.DEBUG, "POSITION_SIZE", equity=equity, risk_pct=risk_pct, entry=entry, stop=stop)
         money_risk = equity * risk_pct
         dist = abs(entry - stop)
         if dist <= 0:

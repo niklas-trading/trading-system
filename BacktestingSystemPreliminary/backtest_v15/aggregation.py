@@ -1,8 +1,11 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 import pandas as pd
 import pytz
 from .config import AggregationConfig
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 
 @dataclass
 class BarAggregator:
@@ -22,6 +25,7 @@ class BarAggregator:
         Input df_1h must be 1h OHLCV with tz-aware index or UTC. Output indexed by block-end timestamp (NY time).
 
         """
+        log_kv(logger, logging.DEBUG, "AGG_START", bars_1h=(0 if df_1h is None else len(df_1h)))
         if df_1h is None or len(df_1h) == 0:
             return df_1h
 
@@ -70,4 +74,5 @@ class BarAggregator:
         })
 
         out.index.name = "Timestamp"
+        log_kv(logger, logging.DEBUG, "AGG_DONE", bars_4h=len(out))
         return out

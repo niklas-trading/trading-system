@@ -1,10 +1,13 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import pandas as pd
 from tqdm import tqdm
 
 from .config import StrategyConfig, SlippageConfig, RiskConfig, AggregationConfig, RegimeConfig
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 from .data import YFDataLoader
 from .aggregation import BarAggregator
 from .features import FeatureBuilder
@@ -41,6 +44,7 @@ class Backtester:
         self.regime_engine = RegimeEngine(regime_cfg, loader)
 
     def run(self, tickers: List[str], params: BacktestParams, show_progress: bool = True) -> Portfolio:
+        log_kv(logger, logging.INFO, "BACKTEST_START", tickers=len(tickers), start=params.start, end=params.end)
         # regime feed (daily), later mapped to intraday timestamps
         regime_daily = self.regime_engine.compute_weekly_regime(params.start, params.end)
 
@@ -48,11 +52,14 @@ class Backtester:
         bars_4h: Dict[str, pd.DataFrame] = {}
         daily: Dict[str, pd.DataFrame] = {}
         for t in tqdm(tickers, disable=not show_progress, desc="Downloading"):
+            log_kv(logger, logging.DEBUG, "BT_TICKER_DOWNLOAD", ticker=t)
             d1h = self.loader.get_ohlcv(t, start=params.start, end=params.end, interval="1h")
             if d1h is None or len(d1h) == 0:
+                log_kv(logger, logging.DEBUG, "BT_TICKER_SKIP", ticker=t, reason="NO_1H_DATA")
                 continue
             b4 = self.aggregator.to_4h_session_aware(d1h)
             if b4 is None or len(b4) < 200:
+                log_kv(logger, logging.DEBUG, "BT_TICKER_SKIP", ticker=t, reason="INSUFFICIENT_4H_BARS", bars_4h=(0 if b4 is None else len(b4)))
                 continue
             bars_4h[t] = b4
 
@@ -172,4 +179,5 @@ class Backtester:
             exit_px = self.slip.apply(close, feat.atr, side="sell")
             portfolio.close_position(t, ts, exit_px, reason="EOD_FORCE")
 
+        log_kv(logger, logging.INFO, "BACKTEST_DONE", trades=len(portfolio.trades), equity=portfolio.equity)
         return portfolio

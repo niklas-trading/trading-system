@@ -1,9 +1,12 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Optional
 import pandas as pd
 
 from .config import StrategyConfig
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 from .indicators import atr, rolling_range
 from .structure import is_hh_hl, last_higher_low_close, detect_swings_close_only
 
@@ -29,9 +32,12 @@ class FeatureBuilder:
         self.cfg = cfg
 
     def snapshot(self, bars_4h: pd.DataFrame, asof_idx: int) -> FeatureSnapshot:
+        log_kv(logger, logging.DEBUG, "FEATURE_SNAPSHOT", asof_idx=asof_idx, bars_4h=(0 if bars_4h is None else len(bars_4h)))
         df = bars_4h.iloc[: asof_idx + 1].copy()
         if len(df) < max(self.cfg.atr_len + self.cfg.atr_ma_len, self.cfg.range_20d_bars) + 5:
-            return FeatureSnapshot(False, None, None, None, None, None, 0, None, None, None)
+            log_kv(logger, logging.DEBUG, "FEATURE_INSUFFICIENT", have=len(df))
+            log_kv(logger, logging.DEBUG, "FEATURE_OK", hh_hl=hh_hl, atr=float(df['ATR'].iloc[-1]) if 'ATR' in df.columns and pd.notna(df['ATR'].iloc[-1]) else None)
+        return FeatureSnapshot(False, None, None, None, None, None, 0, None, None, None)
 
         close = df["Close"]
         hh_hl = is_hh_hl(close, 2, 2)

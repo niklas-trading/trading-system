@@ -2,6 +2,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 import pandas as pd
+import logging
+from .logging import log_kv
+
+logger = logging.getLogger(__name__)
+
 
 from .config import StrategyConfig
 from .types import Signal, SignalType
@@ -14,7 +19,19 @@ class StrategyV15:
 
     def evaluate(self, bars_4h: pd.DataFrame, idx: int, feat: FeatureSnapshot, cat: CatalystInfo, in_position: bool) -> Signal:
         reasons = []
+        # Map internal reason tags to stable debug reason codes
+        REASON_MAP = {
+            "NO_TREND_HHHL": "FAIL_TREND_STRUCTURE",
+            "VOL_FILTER_FAIL": "FAIL_ATR_CONTRACTION",
+            "NO_CATALYST": "FAIL_NO_CATALYST",
+            "PULLBACK_TOO_SHORT": "FAIL_PULLBACK_TOO_SHORT",
+            "PULLBACK_TOO_DEEP": "FAIL_PULLBACK_TOO_DEEP",
+            "PULLBACK_VOL_NOT_LOWER": "FAIL_PULLBACK_VOLUME",
+            "TRIGGER_NOT_MET": "FAIL_TRIGGER_CLOSE",
+        }
 
+
+        bar_ts = bars_4h.index[idx] if bars_4h is not None and len(bars_4h) > idx else None
         # Not enough data safety
         if idx < 5:
             return Signal(SignalType.NONE, ("DATA_TOO_SHORT",), {})
@@ -33,7 +50,7 @@ class StrategyV15:
             if cat.has_catalyst:
                 vol_ok = True
             if not vol_ok:
-                reasons.append("NO_VOLATILITY")
+                reasons.append("VOL_FILTER_FAIL")
             # 3) Catalyst required
             if not cat.has_catalyst:
                 reasons.append("NO_CATALYST")
@@ -53,7 +70,7 @@ class StrategyV15:
                 reasons.append("VOLUME_METRICS_MISSING")
             else:
                 if feat.vol_pullback_avg > feat.vol_impulse_avg:
-                    reasons.append("PULLBACK_VOL_GT_IMPULSE_VOL")
+                    reasons.append("PULLBACK_VOL_NOT_LOWER")
             # 7) Trigger: Close > High(prev bar)
             if float(bars_4h["Close"].iloc[idx]) <= float(bars_4h["High"].iloc[idx-1]):
                 reasons.append("TRIGGER_NOT_MET")

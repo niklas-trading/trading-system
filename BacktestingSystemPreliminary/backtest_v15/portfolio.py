@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 import pandas as pd
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 
 from .types import Position
 
@@ -29,16 +32,21 @@ class Portfolio:
     trades: List[TradeRecord] = field(default_factory=list)
 
     def mark_equity(self) -> None:
+        log_kv(logger, logging.DEBUG, "EQUITY_MARK", equity=self.equity, equity_high=self.equity_high)
         self.equity_high = max(self.equity_high, self.equity)
 
     def open_position(self, pos: Position) -> None:
+        log_kv(logger, logging.INFO, "PORTFOLIO_OPEN", ticker=pos.ticker, entry_price=pos.entry_price, size=pos.size, stop=pos.stop)
         self.positions[pos.ticker] = pos
 
     def close_position(self, ticker: str, ts, exit_price: float, reason: str) -> None:
+        log_kv(logger, logging.INFO, "PORTFOLIO_CLOSE", ticker=ticker, exit_price=exit_price, reason=reason)
         pos = self.positions.pop(ticker, None)
         if pos is None:
+            log_kv(logger, logging.WARNING, "PORTFOLIO_CLOSE_NO_POSITION", ticker=ticker)
             return
         pnl = (exit_price - pos.entry_price) * pos.size
+        log_kv(logger, logging.DEBUG, "PORTFOLIO_PNL", ticker=ticker, pnl=pnl)
         # R-multiple computed vs initial risk per trade
         init_risk_money = abs(pos.entry_price - pos.stop_close) * pos.size
         r_mult = pnl / init_risk_money if init_risk_money > 0 else 0.0

@@ -1,5 +1,7 @@
 from __future__ import annotations
 import argparse, os, time
+import logging
+from datetime import datetime
 from dataclasses import asdict
 
 from .config import UniverseConfig, DataConfig, AggregationConfig, SlippageConfig, RiskConfig, StrategyConfig, RegimeConfig
@@ -7,8 +9,13 @@ from .data import YFDataLoader
 from .universe import UniverseBuilder
 from .backtest import Backtester, BacktestParams
 from .reporting import save_run
+from .logging import setup_logging, log_kv
 
 def cmd_run(args):
+    # Multi-level project logging (console=INFO, file=DEBUG; overwrites per run)
+    setup_logging(overwrite=True)
+    logger = logging.getLogger(__name__)
+    log_kv(logger, logging.INFO, "RUN_START", start=args.start, end=args.end, sample=args.sample, tickers_file=args.tickers_file)
     ucfg = UniverseConfig(
         min_price=args.min_price,
         min_avg_dollar_vol_20d=args.min_dvol,
@@ -72,9 +79,14 @@ def build_parser():
     r.add_argument("--out-dir", default="runs")
 
     # hygiene
-    r.add_argument("--min-price", type=float, default=5.0)
-    r.add_argument("--min-dvol", type=float, default=10_000_000.0)
-    r.add_argument("--min-1h-days", type=int, default=365)
+    #
+    # By default the universe pre‑screener does not filter on price,
+    # liquidity or long intraday history.  Users can still supply
+    # positive values to enable stricter hygiene if desired.  See
+    # UniverseConfig for details.
+    r.add_argument("--min-price", type=float, default=0.0)
+    r.add_argument("--min-dvol", type=float, default=0.0)
+    r.add_argument("--min-1h-days", type=int, default=0)
 
     # slippage
     r.add_argument("--slip-seed", type=int, default=7)

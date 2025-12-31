@@ -1,10 +1,13 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
 import pandas as pd
 from .data import YFDataLoader
 from .indicators import atr, pct_change
 from .structure import detect_swings_close_only
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 
 @dataclass
 class CatalystInfo:
@@ -17,6 +20,7 @@ class CatalystEngine:
     loader: YFDataLoader
 
     def get_earnings_catalyst(self, ticker: str, daily: pd.DataFrame, asof: pd.Timestamp, max_age_days: int = 10) -> CatalystInfo:
+        log_kv(logger, logging.DEBUG, "CATALYST_CHECK", ticker=ticker, asof=str(asof.date()) if hasattr(asof,'date') else str(asof), max_age_days=max_age_days)
         """Uses yfinance calendar as a catalyst proxy (earnings date).
 
         Classification K1/K2 uses a simplified daily reaction check.
@@ -24,7 +28,9 @@ class CatalystEngine:
         """
         cal = self.loader.get_calendar(ticker)
         if cal is None:
-            return CatalystInfo(False, "NONE", None)
+            log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_CALENDAR")
+        log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_EARNINGS_IN_WINDOW")
+        return CatalystInfo(False, "NONE", None)
 
         # attempt to find an earnings date
         earn_dt = None

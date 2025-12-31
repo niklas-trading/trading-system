@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 import pandas as pd
 from .config import RegimeConfig
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 from .data import YFDataLoader
 from .indicators import sma, atr
 
@@ -11,6 +14,7 @@ class RegimeEngine:
     loader: YFDataLoader
 
     def compute_weekly_regime(self, start: str, end: str) -> pd.Series:
+        log_kv(logger, logging.INFO, "REGIME_START", ref=self.cfg.ref_ticker, start=start, end=end)
         """Returns a daily-indexed Series with regime values that are held constant for the next week.
 
         Regime computed on weekly close (Friday) using daily data, applied to next week's dates.

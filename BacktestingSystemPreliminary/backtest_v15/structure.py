@@ -1,6 +1,9 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 import pandas as pd
+from .logging import log_kv
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class SwingPoints:
@@ -8,6 +11,7 @@ class SwingPoints:
     swing_low: pd.Series   # bool
 
 def detect_swings_close_only(close: pd.Series, left: int = 2, right: int = 2) -> SwingPoints:
+    log_kv(logger, logging.DEBUG, "STRUCT_SWINGS", rows=len(close), left=left, right=right)
     """Simple pivot detection on close-only.
 
     A swing high at t if close[t] is max in window [t-left, t+right].
@@ -32,6 +36,7 @@ def last_two_values(series: pd.Series, mask: pd.Series) -> tuple[float|None, flo
     return float(pts.iloc[-2]), float(pts.iloc[-1])
 
 def is_hh_hl(close: pd.Series, left: int = 2, right: int = 2) -> bool:
+    log_kv(logger, logging.DEBUG, "STRUCT_HHHL_CHECK", rows=len(close))
     swings = detect_swings_close_only(close, left, right)
     hi2 = close[swings.swing_high]
     lo2 = close[swings.swing_low]
