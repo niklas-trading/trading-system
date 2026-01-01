@@ -25,8 +25,8 @@ class RegimeEngine:
             raise RuntimeError("Not enough data for regime computation.")
 
         d = df.copy()
-        d["SMA_F"] = sma(d["Close"], self.cfg.sma_fast)
-        d["SMA_S"] = sma(d["Close"], self.cfg.sma_slow)
+        d["SMA_F"] = sma(d["close"], self.cfg.sma_fast)
+        d["SMA_S"] = sma(d["close"], self.cfg.sma_slow)
         d["ATR"] = atr(d, self.cfg.atr_len)
         d["ATR_MA"] = d["ATR"].rolling(self.cfg.atr_ma_len).mean()
 
@@ -34,7 +34,7 @@ class RegimeEngine:
         def _reg(row):
             if pd.isna(row["SMA_F"]) or pd.isna(row["SMA_S"]) or pd.isna(row["ATR"]) or pd.isna(row["ATR_MA"]):
                 return None
-            close = row["Close"]
+            close = row["close"]
             if close < row["SMA_S"]:
                 return "Defensiv"
             if (close > row["SMA_F"]) and (row["ATR"] >= row["ATR_MA"]):

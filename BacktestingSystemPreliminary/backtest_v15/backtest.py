@@ -93,7 +93,7 @@ class Backtester:
                 if df is None or ts not in df.index:
                     continue
                 i = df.index.get_loc(ts)
-                close = float(df["Close"].iloc[i])
+                close = float(df["close"].iloc[i])
                 feat = self.feats.snapshot(df, i)
 
                 # stop on close below stop_close
@@ -147,7 +147,7 @@ class Backtester:
                     catalyst_class=cat.catalyst_class,
                 )
 
-                entry_close = float(df["Close"].iloc[i])
+                entry_close = float(df["close"].iloc[i])
                 entry_px = self.slip.apply(entry_close, feat.atr, side="buy")
 
                 stop = float(feat.last_hl_close) if feat.last_hl_close is not None else entry_close
@@ -175,7 +175,7 @@ class Backtester:
             ts = df.index[-1]
             i = len(df) - 1
             feat = self.feats.snapshot(df, i)
-            close = float(df["Close"].iloc[i])
+            close = float(df["close"].iloc[i])
             exit_px = self.slip.apply(close, feat.atr, side="sell")
             portfolio.close_position(t, ts, exit_px, reason="EOD_FORCE")
 

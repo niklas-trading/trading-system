@@ -43,6 +43,7 @@ class UniverseBuilder:
         seed: int = 42,
         progress: bool = True,
     ) -> List[UniverseItem]:
+        # Deduplicate and shuffle tickers
         tickers = list(dict.fromkeys(list(tickers)))
         rnd = random.Random(seed)
         rnd.shuffle(tickers)
@@ -53,16 +54,33 @@ class UniverseBuilder:
         for t in tickers:
             tested += 1
             log_kv(logger, logging.DEBUG, "UNIVERSE_TEST", ticker=t)
+            # Filter out non-common stock tickers such as warrants (W), units (U), rights (R), etc.
+            tu = t.upper()
+            if tu.endswith(("W", "WS", "U", "R")):
+                rejected += 1
+                log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT_NON_COMMON_STOCK", ticker=t)
+                continue
             if self._passes_hygiene(t, start, end):
                 accepted.append(t)
                 log_kv(logger, logging.DEBUG, "UNIVERSE_ACCEPT", ticker=t, accepted=len(accepted))
+            else:
+                rejected += 1
             if len(accepted) >= sample_size:
                 break
 
-        log_kv(logger, logging.INFO, "UNIVERSE_SUMMARY", requested=sample_size, accepted=len(accepted), tested=tested, rejected=rejected)
+        log_kv(
+            logger,
+            logging.INFO,
+            "UNIVERSE_SUMMARY",
+            requested=sample_size,
+            accepted=len(accepted),
+            tested=tested,
+            rejected=rejected,
+        )
+
         if len(accepted) < sample_size:
             raise RuntimeError(
-                f"Universe too small after hygiene filters: {len(accepted)} < {sample_size}. " 
+                f"Universe too small after hygiene filters: {len(accepted)} < {sample_size}. "
                 f"Relax UniverseConfig or provide more tickers."
             )
 
@@ -84,25 +102,24 @@ class UniverseBuilder:
         # 1) Ensure there is at least some daily data in the sample
         daily = self.loader.get_ohlcv(ticker, start=start, end=end, interval="1d")
         if daily is None or len(daily) < 30:
-            # Not enough daily bars to compute swing structure, ATR etc.
+            log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="NO_DAILY_DATA")
             return False
 
         # 2) Optionally enforce minimum price and average dollar volume if configured
-        # When cfg.min_price or cfg.min_avg_dollar_vol_20d are zero the
-        # following checks always pass.
-        last_close = float(daily["Close"].iloc[-1])
+        # When cfg.min_price or cfg.min_avg_dollar_vol_20d are zero the following checks always pass.
+        last_close = float(daily["close"].iloc[-1])
         if self.cfg.min_price > 0 and last_close <= self.cfg.min_price:
+            log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="MIN_PRICE")
             return False
 
         if self.cfg.min_avg_dollar_vol_20d > 0:
-            dv = (daily["Close"] * daily["Volume"]).rolling(20).mean().iloc[-1]
+            dv = (daily["close"] * daily["volume"]).rolling(20).mean().iloc[-1]
             if pd.isna(dv) or float(dv) < self.cfg.min_avg_dollar_vol_20d:
+                log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="LOW_DOLLAR_VOL")
                 return False
 
-        # 3) Check for availability of some 1H data to build synthetic 4H bars.  We
-        # look back min_1h_days + 30 calendar days to ensure we have at
-        # least a couple of weeks worth of intraday bars.  If the user
-        # sets min_1h_days=0 this becomes a 30‑day lookback.
+        # 3) Check for availability of some 1H data to build synthetic 4H bars.
+        # We look back min_1h_days + 30 calendar days to ensure we have at least a couple of weeks worth of intraday bars.
         oneh = self.loader.get_ohlcv(
             ticker,
             start=None,
@@ -111,12 +128,14 @@ class UniverseBuilder:
             lookback_days=self.cfg.min_1h_days + 30,
         )
         if oneh is None or len(oneh) == 0:
+            log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="NO_1H_DATA")
             return False
 
         # If a specific minimum number of 1H days is requested, verify the span
         if self.cfg.min_1h_days > 0:
             span_days = (oneh.index.max() - oneh.index.min()).days
             if span_days < self.cfg.min_1h_days:
+                log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="INSUFFICIENT_1H_SPAN")
                 return False
 
         return True

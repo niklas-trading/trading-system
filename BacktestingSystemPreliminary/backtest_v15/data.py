@@ -25,6 +25,23 @@ def _key(*parts: str) -> str:
     return hashlib.sha256(raw).hexdigest()[:24]
 
 
+def _load_any_cached_ohlcv(cache_dir: str) -> Optional[pd.DataFrame]:
+    if not cache_dir or not os.path.exists(cache_dir):
+        return None
+
+    for fname in os.listdir(cache_dir):
+        if not fname.endswith(".parquet"):
+            continue
+        try:
+            df = pd.read_parquet(os.path.join(cache_dir, fname))
+            if df is not None and len(df) > 0:
+                return df
+        except Exception:
+            continue
+
+    return None
+
+
 @dataclass
 class YFDataLoader:
     cfg: DataConfig
@@ -94,31 +111,81 @@ class YFDataLoader:
             return None
 
         if df is None or len(df) == 0:
-            log_kv(logger, logging.WARNING, "DATA_EMPTY", ticker=ticker, interval=interval)
+            log_kv(
+                logger,
+                logging.WARNING,
+                "DATA_EMPTY_PRIMARY",
+                ticker=ticker,
+                interval=interval,
+            )
+
+            # HARD RULE: never do period-based fallback
+            # Instead: try ANY cached OHLCV as universe-padding
+            if self.cfg.cache_dir:
+                fallback_df = _load_any_cached_ohlcv(self.cfg.cache_dir)
+                if fallback_df is not None:
+                    log_kv(
+                        logger,
+                        logging.WARNING,
+                        "DATA_FALLBACK_FROM_CACHE",
+                        ticker=ticker,
+                        interval=interval,
+                        rows=len(fallback_df),
+                    )
+                    return fallback_df
+
+            log_kv(
+                logger,
+                logging.ERROR,
+                "DATA_NO_FALLBACK_AVAILABLE",
+                ticker=ticker,
+                interval=interval,
+            )
             return None
 
-        # If multi-index (multiple tickers), extract our ticker
+
+    # Flatten multi-index if present. yfinance returns DataFrame with MultiIndex columns where
+        # level 0 is the field and level 1 is the ticker. For a single ticker, flatten using field names.
         if isinstance(df.columns, pd.MultiIndex):
-            if ticker not in df.columns.get_level_values(0):
-                log_kv(logger, logging.WARNING, "DATA_MULTIINDEX_MISSING_TICKER", ticker=ticker, interval=interval)
-                return None
-            df = df.xs(ticker, axis=1, level=0, drop_level=True)
+            # capture the field names (level 0)
+            raw_fields = [c[0] for c in df.columns]
+            # lower-case field names to become columns
+            df.columns = [f.lower() for f in raw_fields]
+            log_kv(
+                logger,
+                logging.DEBUG,
+                "DATA_MULTIINDEX_FLATTENED",
+                ticker=ticker,
+                interval=interval,
+                fields=",".join(sorted(set(df.columns))),
+            )
+        else:
+            # single-level columns: just lower-case them
+            df.columns = [c.lower() for c in df.columns]
 
-        # Normalize columns
-        df = df.rename(columns={
-            "Open": "open",
-            "High": "high",
-            "Low": "low",
-            "Close": "close",
-            "Adj Close": "close",
-            "Volume": "volume",
-        })
-        df.columns = [c.lower() for c in df.columns]
+        # unify adj close to close if present
+        if "adj close" in df.columns and "close" not in df.columns:
+            df = df.rename(columns={"adj close": "close"})
 
-        # Basic clean
-        if "close" not in df.columns:
-            log_kv(logger, logging.WARNING, "DATA_MISSING_CLOSE", ticker=ticker, interval=interval)
+        # verify we have expected columns
+        expected = {"open", "high", "low", "close", "volume"}
+        missing = expected - set(df.columns)
+        if missing:
+            log_kv(
+                logger,
+                logging.WARNING,
+                "DATA_COLUMNS_INVALID",
+                ticker=ticker,
+                interval=interval,
+                missing=",".join(sorted(missing)),
+                columns=",".join(df.columns),
+            )
             return None
+
+        # drop any extra columns like dividends
+        df = df[[col for col in df.columns if col in expected]]
+
+        # drop rows where close is NaN
         df = df.dropna(subset=["close"])
         if len(df) == 0:
             log_kv(logger, logging.WARNING, "DATA_EMPTY_AFTER_CLEAN", ticker=ticker, interval=interval)

@@ -81,33 +81,33 @@ class CatalystEngine:
             return CatalystInfo(True, "K2", earn_dt)
 
         d["ATR"] = atr(d, 14)
-        d["VOL_MA"] = d["Volume"].rolling(20).mean()
+        d["VOL_MA"] = d["volume"].rolling(20).mean()
         day = d.loc[earn_dt:earn_dt].iloc[0]
 
         # Criteria (count)
         c = 0
         # range >= 1.5*ATR and close in upper third
-        rng = float(day["High"] - day["Low"])
+        rng = float(day["high"] - day["low"])
         if pd.notna(day["ATR"]) and day["ATR"] > 0:
             if rng >= 1.5 * float(day["ATR"]):
-                if float(day["Close"]) >= float(day["Low"]) + (rng * (2/3)):
+                if float(day["close"]) >= float(day["low"]) + (rng * (2/3)):
                     c += 1
         # close above last swing high (close-only)
-        swings = detect_swings_close_only(d["Close"], 2, 2)
-        highs = d["Close"][swings.swing_high]
+        swings = detect_swings_close_only(d["close"], 2, 2)
+        highs = d["close"][swings.swing_high]
         if len(highs) > 0:
             prev_high = float(highs.iloc[-1])
-            if float(day["Close"]) > prev_high:
+            if float(day["close"]) > prev_high:
                 c += 1
         # volume >= 1.5*MA OR close pct >= 1.2%
         if pd.notna(day["VOL_MA"]) and float(day["VOL_MA"]) > 0:
-            if float(day["Volume"]) >= 1.5 * float(day["VOL_MA"]):
+            if float(day["volume"]) >= 1.5 * float(day["VOL_MA"]):
                 c += 1
             else:
                 # pct change vs prev close
-                prev = d.loc[:earn_dt].iloc[-2]["Close"] if len(d.loc[:earn_dt]) >= 2 else None
+                prev = d.loc[:earn_dt].iloc[-2]["close"] if len(d.loc[:earn_dt]) >= 2 else None
                 if prev is not None and prev > 0:
-                    if (float(day["Close"]) / float(prev) - 1.0) >= 0.012:
+                    if (float(day["close"]) / float(prev) - 1.0) >= 0.012:
                         c += 1
 
         cls = "K1" if c >= 2 else "K2"

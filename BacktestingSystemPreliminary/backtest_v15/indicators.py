@@ -19,7 +19,7 @@ def true_range(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
 
 def atr(df: pd.DataFrame, n: int) -> pd.Series:
     log_kv(logger, logging.DEBUG, "IND_ATR", n=n, rows=(0 if df is None else len(df)))
-    tr = true_range(df["High"], df["Low"], df["Close"])
+    tr = true_range(df["high"], df["low"], df["close"])
     out = tr.rolling(n).mean()
     if out.isna().all():
         log_kv(logger, logging.DEBUG, "IND_ATR_ALL_NA", n=n)
@@ -27,8 +27,8 @@ def atr(df: pd.DataFrame, n: int) -> pd.Series:
 
 def rolling_range(df: pd.DataFrame, n: int) -> pd.Series:
     log_kv(logger, logging.DEBUG, "IND_RANGE", n=n, rows=(0 if df is None else len(df)))
-    hh = df["High"].rolling(n).max()
-    ll = df["Low"].rolling(n).min()
+    hh = df["high"].rolling(n).max()
+    ll = df["low"].rolling(n).min()
     out = hh - ll
     if out.isna().all():
         log_kv(logger, logging.DEBUG, "IND_RANGE_ALL_NA", n=n)

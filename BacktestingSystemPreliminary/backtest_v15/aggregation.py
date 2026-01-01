@@ -66,11 +66,11 @@ class BarAggregator:
         g = df.groupby("_block_end", sort=True)
 
         out = pd.DataFrame({
-            "Open": g["Open"].first(),
-            "High": g["High"].max(),
-            "Low":  g["Low"].min(),
-            "Close": g["Close"].last(),
-            "Volume": g["Volume"].sum(),
+            "open": g["open"].first(),
+            "high": g["high"].max(),
+            "low":  g["low"].min(),
+            "close": g["close"].last(),
+            "volume": g["volume"].sum(),
         })
 
         out.index.name = "Timestamp"

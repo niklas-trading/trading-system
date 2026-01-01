@@ -38,7 +38,7 @@ class StrategyV15:
 
         # ENTRY logic
         if not in_position:
-            # 1) Trend HH/HL (Close-only)
+            # 1) Trend HH/HL (close-only)
             if not feat.hh_hl:
                 reasons.append("NO_TREND_HHHL")
             # 2) Volatility filter: at least one condition
@@ -63,7 +63,7 @@ class StrategyV15:
             if feat.last_hl_close is None:
                 reasons.append("NO_LAST_HL")
             else:
-                if float(bars_4h["Close"].iloc[idx]) < float(feat.last_hl_close):
+                if float(bars_4h["close"].iloc[idx]) < float(feat.last_hl_close):
                     reasons.append("CLOSE_BELOW_LAST_HL")
             # 6) Volume filter v1.5: pullback avg volume must be <= impulse avg volume
             if (feat.vol_pullback_avg is None) or (feat.vol_impulse_avg is None):
@@ -71,8 +71,8 @@ class StrategyV15:
             else:
                 if feat.vol_pullback_avg > feat.vol_impulse_avg:
                     reasons.append("PULLBACK_VOL_NOT_LOWER")
-            # 7) Trigger: Close > High(prev bar)
-            if float(bars_4h["Close"].iloc[idx]) <= float(bars_4h["High"].iloc[idx-1]):
+            # 7) Trigger: close > high(prev bar)
+            if float(bars_4h["close"].iloc[idx]) <= float(bars_4h["high"].iloc[idx-1]):
                 reasons.append("TRIGGER_NOT_MET")
 
             if len(reasons) == 0:

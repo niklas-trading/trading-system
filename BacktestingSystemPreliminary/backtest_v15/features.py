@@ -39,7 +39,7 @@ class FeatureBuilder:
             log_kv(logger, logging.DEBUG, "FEATURE_OK", hh_hl=hh_hl, atr=float(df['ATR'].iloc[-1]) if 'ATR' in df.columns and pd.notna(df['ATR'].iloc[-1]) else None)
         return FeatureSnapshot(False, None, None, None, None, None, 0, None, None, None)
 
-        close = df["Close"]
+        close = df["close"]
         hh_hl = is_hh_hl(close, 2, 2)
         last_hl = last_higher_low_close(close, 2, 2)
 
@@ -69,9 +69,9 @@ class FeatureBuilder:
         )
 
     def _pullback_metrics(self, df: pd.DataFrame):
-        # pullback bars: count consecutive bars where Close <= prev Close (sideways/down) from the end
-        closes = df["Close"].values
-        vols = df["Volume"].values
+        # pullback bars: count consecutive bars where close <= prev close (sideways/down) from the end
+        closes = df["close"].values
+        vols = df["volume"].values
         n = len(df)
         pb = 0
         i = n - 1
@@ -85,9 +85,9 @@ class FeatureBuilder:
             return pb, None, None, None
 
         # swing points on close-only
-        swings = detect_swings_close_only(df["Close"], 2, 2)
-        swing_lows = df["Close"][swings.swing_low]
-        swing_highs = df["Close"][swings.swing_high]
+        swings = detect_swings_close_only(df["close"], 2, 2)
+        swing_lows = df["close"][swings.swing_low]
+        swing_highs = df["close"][swings.swing_high]
         if len(swing_lows) == 0 or len(swing_highs) == 0:
             return pb, None, None, None
 
@@ -108,7 +108,7 @@ class FeatureBuilder:
         if impulse <= 0:
             return pb, None, None, None
 
-        pb_low = float(df["Close"].iloc[-pb:].min())
+        pb_low = float(df["close"].iloc[-pb:].min())
         retrace = (last_high - pb_low) / impulse  # fraction retraced
         # volume: compare avg volume in pullback vs impulse window (from low->high)
         # approximate impulse window: last 6 bars ending at pb_start
