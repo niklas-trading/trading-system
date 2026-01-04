@@ -2,12 +2,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Optional
+
+import numpy as np
 import pandas as pd
 
 from .config import StrategyConfig
 from .logging import log_kv
 logger = logging.getLogger(__name__)
-from .indicators import atr, rolling_range
+from .indicators import atr, rolling_range, sma
 from .structure import is_hh_hl, last_higher_low_close, detect_swings_close_only
 
 @dataclass
@@ -32,28 +34,63 @@ class FeatureBuilder:
         self.cfg = cfg
 
     def snapshot(self, bars_4h: pd.DataFrame, asof_idx: int) -> FeatureSnapshot:
-        log_kv(logger, logging.DEBUG, "FEATURE_SNAPSHOT", asof_idx=asof_idx, bars_4h=(0 if bars_4h is None else len(bars_4h)))
+        """Compute the feature snapshot at a specific bar index.
+
+        bars_4h is expected to have lowercase OHLCV columns: open/high/low/close/volume.
+        """
+        if bars_4h is None or len(bars_4h) == 0:
+            log_kv(logger, logging.DEBUG, "FEATURE_EMPTY_INPUT")
+            return FeatureSnapshot(False, None, None, None, None, None, None, None, None)
+
+        # Use all data up to and including asof_idx
+        asof_idx = int(asof_idx)
+        if asof_idx < 0:
+            return FeatureSnapshot(False, None, None, None, None, None, None, None, None)
         df = bars_4h.iloc[: asof_idx + 1].copy()
-        if len(df) < max(self.cfg.atr_len + self.cfg.atr_ma_len, self.cfg.range_20d_bars) + 5:
-            log_kv(logger, logging.DEBUG, "FEATURE_INSUFFICIENT", have=len(df))
-            log_kv(logger, logging.DEBUG, "FEATURE_OK", hh_hl=hh_hl, atr=float(df['ATR'].iloc[-1]) if 'ATR' in df.columns and pd.notna(df['ATR'].iloc[-1]) else None)
-        return FeatureSnapshot(False, None, None, None, None, None, 0, None, None, None)
 
-        close = df["close"]
-        hh_hl = is_hh_hl(close, 2, 2)
-        last_hl = last_higher_low_close(close, 2, 2)
+        required = max(
+            int(getattr(self.cfg, "range_20d_bars", 120)),
+            int(getattr(self.cfg, "atr_len", 14)) + int(getattr(self.cfg, "atr_ma_len", 20)) + 5,
+            60,
+        )
+        if len(df) < required:
+            log_kv(logger, logging.DEBUG, "FEATURE_INSUFFICIENT", have=len(df), need=required)
+            return FeatureSnapshot(False, None, None, None, None, None, None, None, None, None)
 
-        df["ATR"] = atr(df, self.cfg.atr_len)
-        df["ATR_MA"] = df["ATR"].rolling(self.cfg.atr_ma_len).mean()
-        df["R5"] = rolling_range(df, self.cfg.range_5d_bars)
-        df["R20"] = rolling_range(df, self.cfg.range_20d_bars)
+        # Core indicators
+        df["ATR"] = atr(df, int(self.cfg.atr_len))
+        df["ATR_MA"] = sma(df["ATR"], int(self.cfg.atr_ma_len))
+        df["R5"] = rolling_range(df, int(self.cfg.range_5d_bars))
+        df["R20"] = rolling_range(df, int(self.cfg.range_20d_bars))
+
+        hh_hl = is_hh_hl(df["close"], 2, 2)
+        last_hl = last_higher_low_close(df["close"], 2, 2)
 
         atr_v = float(df["ATR"].iloc[-1]) if pd.notna(df["ATR"].iloc[-1]) else None
         atr_ma_v = float(df["ATR_MA"].iloc[-1]) if pd.notna(df["ATR_MA"].iloc[-1]) else None
+        atr_ratio = (atr_v / atr_ma_v) if (atr_v is not None and atr_ma_v not in (None, 0.0) and pd.notna(atr_ma_v)) else None
+
+        pb, retrace, vol_pb, vol_imp = self._pullback_metrics(df)
+
         r5 = float(df["R5"].iloc[-1]) if pd.notna(df["R5"].iloc[-1]) else None
         r20 = float(df["R20"].iloc[-1]) if pd.notna(df["R20"].iloc[-1]) else None
 
-        pb_bars, pb_retrace, vol_pb, vol_imp = self._pullback_metrics(df)
+        log_kv(
+            logger,
+            logging.DEBUG,
+            "FEATURE_OK",
+            hh_hl=hh_hl,
+            last_hl=last_hl,
+            atr=atr_v,
+            atr_ma=atr_ma_v,
+            atr_ratio=atr_ratio,
+            pb=pb,
+            retrace=retrace,
+            vol_pullback_avg=vol_pb,
+            vol_impulse_avg=vol_imp,
+            r5=r5,
+            r20=r20
+        )
 
         return FeatureSnapshot(
             hh_hl=hh_hl,
@@ -62,58 +99,48 @@ class FeatureBuilder:
             atr_ma=atr_ma_v,
             range5=r5,
             range20=r20,
-            pullback_bars=pb_bars,
-            pullback_retrace=pb_retrace,
+            pullback_bars=pb,
+            pullback_retrace=retrace,
             vol_pullback_avg=vol_pb,
             vol_impulse_avg=vol_imp,
         )
 
+
+
     def _pullback_metrics(self, df: pd.DataFrame):
-        # pullback bars: count consecutive bars where close <= prev close (sideways/down) from the end
-        closes = df["close"].values
-        vols = df["volume"].values
-        n = len(df)
-        pb = 0
-        i = n - 1
-        while i > 0 and closes[i] <= closes[i-1]:
-            pb += 1
-            i -= 1
-        # require at least 1 previous bar; pb counts bars against trend ending at last bar
-        # impulse: from last swing low to last swing high before pullback start
-        pb_start = n - pb - 1  # index of last bar before pullback sequence (impulse end candidate)
-        if pb < 1 or pb_start < 5:
-            return pb, None, None, None
+        if df is None or len(df) < 5:
+            return 0, None, None, None
 
-        # swing points on close-only
         swings = detect_swings_close_only(df["close"], 2, 2)
-        swing_lows = df["close"][swings.swing_low]
-        swing_highs = df["close"][swings.swing_high]
-        if len(swing_lows) == 0 or len(swing_highs) == 0:
-            return pb, None, None, None
 
-        # last swing high before pb_start
-        highs_before = swing_highs[swing_highs.index <= df.index[pb_start]]
-        lows_before = swing_lows[swing_lows.index <= df.index[pb_start]]
-        if len(highs_before) == 0 or len(lows_before) == 0:
-            return pb, None, None, None
+        low_idx = df.index[swings.swing_low].tolist()
+        high_idx = df.index[swings.swing_high].tolist()
 
-        last_high = float(highs_before.iloc[-1])
-        # choose last low before that high
-        low_before_high = lows_before[lows_before.index <= highs_before.index[-1]]
-        if len(low_before_high) == 0:
-            return pb, None, None, None
-        last_low = float(low_before_high.iloc[-1])
+        if not low_idx or not high_idx:
+            return 0, None, None, None
 
-        impulse = last_high - last_low
-        if impulse <= 0:
-            return pb, None, None, None
+        last_low = low_idx[-1]
+        last_high = high_idx[-1]
 
-        pb_low = float(df["close"].iloc[-pb:].min())
-        retrace = (last_high - pb_low) / impulse  # fraction retraced
-        # volume: compare avg volume in pullback vs impulse window (from low->high)
-        # approximate impulse window: last 6 bars ending at pb_start
-        imp_start = max(0, pb_start - 6)
-        vol_imp = float(np.mean(vols[imp_start:pb_start+1])) if (pb_start+1-imp_start) >= 2 else None
-        vol_pb = float(np.mean(vols[n-pb:n])) if pb >= 1 else None
+        if last_low >= last_high:
+            return 0, None, None, None
 
-        return pb, float(retrace), vol_pb, vol_imp
+        impulse = df.loc[last_low:last_high]
+
+        pos_high = df.index.get_loc(last_high)
+        pullback = df.iloc[pos_high + 1 :]
+
+        pullback_bars = len(pullback)
+
+        impulse_low = impulse["low"].min()
+        impulse_high = impulse["high"].max()
+        rng = impulse_high - impulse_low
+
+        retrace = None
+        if pullback_bars > 0 and rng > 0:
+            retrace = (impulse_high - pullback["low"].min()) / rng
+
+        vol_imp = impulse["volume"].mean() if "volume" in impulse else None
+        vol_pb = pullback["volume"].mean() if pullback_bars > 0 else None
+
+        return pullback_bars, retrace, vol_pb, vol_imp

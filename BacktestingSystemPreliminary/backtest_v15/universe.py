@@ -1,22 +1,25 @@
 from __future__ import annotations
+
 import random
 from dataclasses import dataclass
-from typing import Iterable, List, Optional
-import pandas as pd
-from .config import UniverseConfig
-from .data import YFDataLoader
-from .logging import log_kv
+from typing import Iterable, List
 import logging
+import pandas as pd
 
+from .config import UniverseConfig
+from .data import YFDataLoader, aggregate_1d_from_1h
+from .logging import log_kv
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class UniverseItem:
     ticker: str
 
+
 class UniverseBuilder:
-    """Pre-screener: hygiene + random sampling. No alpha, no trend/ATR filters."""
+    """Pre-screener: hygiene + random sampling. Strategy-conform."""
 
     def __init__(self, cfg: UniverseConfig, loader: YFDataLoader):
         self.cfg = cfg
@@ -24,7 +27,6 @@ class UniverseBuilder:
 
     @staticmethod
     def read_tickers_file(path: str) -> List[str]:
-        # one ticker per line; comments with '#'
         out = []
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
@@ -35,15 +37,14 @@ class UniverseBuilder:
         return out
 
     def build_random_sample(
-        self,
-        tickers: Iterable[str],
-        start: str,
-        end: str,
-        sample_size: int = 100,
-        seed: int = 42,
-        progress: bool = True,
+            self,
+            tickers: Iterable[str],
+            start: str,
+            end: str,
+            sample_size: int = 100,
+            seed: int = 42,
     ) -> List[UniverseItem]:
-        # Deduplicate and shuffle tickers
+
         tickers = list(dict.fromkeys(list(tickers)))
         rnd = random.Random(seed)
         rnd.shuffle(tickers)
@@ -51,20 +52,22 @@ class UniverseBuilder:
         accepted: List[str] = []
         tested = 0
         rejected = 0
+
         for t in tickers:
             tested += 1
             log_kv(logger, logging.DEBUG, "UNIVERSE_TEST", ticker=t)
-            # Filter out non-common stock tickers such as warrants (W), units (U), rights (R), etc.
+
             tu = t.upper()
             if tu.endswith(("W", "WS", "U", "R")):
                 rejected += 1
-                log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT_NON_COMMON_STOCK", ticker=t)
                 continue
+
             if self._passes_hygiene(t, start, end):
                 accepted.append(t)
                 log_kv(logger, logging.DEBUG, "UNIVERSE_ACCEPT", ticker=t, accepted=len(accepted))
             else:
                 rejected += 1
+
             if len(accepted) >= sample_size:
                 break
 
@@ -80,62 +83,32 @@ class UniverseBuilder:
 
         if len(accepted) < sample_size:
             raise RuntimeError(
-                f"Universe too small after hygiene filters: {len(accepted)} < {sample_size}. "
-                f"Relax UniverseConfig or provide more tickers."
+                f"Universe too small after hygiene filters: {len(accepted)} < {sample_size}"
             )
 
         return [UniverseItem(t) for t in accepted]
 
     def _passes_hygiene(self, ticker: str, start: str, end: str) -> bool:
-        """Return True if the given ticker has enough data to perform a backtest.
-
-        The hygiene check here is intentionally conservative: it verifies
-        that we can fetch some daily and intraday data for the symbol in
-        the backtest window.  It no longer filters on price or
-        liquidity; those constraints are controlled by the trading
-        strategy itself.  Intraday data is required because 4H bars are
-        synthesised from 1H bars; however, we only insist on a short
-        lookback instead of a full year to avoid excluding newer
-        listings or thinly traded stocks.  If no intraday data is
-        available the symbol is skipped.
         """
-        # 1) Ensure there is at least some daily data in the sample
-        daily = self.loader.get_ohlcv(ticker, start=start, end=end, interval="1d")
-        if daily is None or len(daily) < 30:
-            log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="NO_DAILY_DATA")
-            return False
+        Strategy-conform hygiene:
+        - load 1H data
+        - derive synthetic Daily from 1H
+        """
 
-        # 2) Optionally enforce minimum price and average dollar volume if configured
-        # When cfg.min_price or cfg.min_avg_dollar_vol_20d are zero the following checks always pass.
-        last_close = float(daily["close"].iloc[-1])
-        if self.cfg.min_price > 0 and last_close <= self.cfg.min_price:
-            log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="MIN_PRICE")
-            return False
-
-        if self.cfg.min_avg_dollar_vol_20d > 0:
-            dv = (daily["close"] * daily["volume"]).rolling(20).mean().iloc[-1]
-            if pd.isna(dv) or float(dv) < self.cfg.min_avg_dollar_vol_20d:
-                log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="LOW_DOLLAR_VOL")
-                return False
-
-        # 3) Check for availability of some 1H data to build synthetic 4H bars.
-        # We look back min_1h_days + 30 calendar days to ensure we have at least a couple of weeks worth of intraday bars.
         oneh = self.loader.get_ohlcv(
-            ticker,
-            start=None,
-            end=None,
+            ticker=ticker,
+            start=start,
+            end=end,
             interval="1h",
-            lookback_days=self.cfg.min_1h_days + 30,
         )
-        if oneh is None or len(oneh) == 0:
+
+        if oneh is None or len(oneh) < 50:
             log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="NO_1H_DATA")
             return False
 
-        # If a specific minimum number of 1H days is requested, verify the span
-        if self.cfg.min_1h_days > 0:
-            span_days = (oneh.index.max() - oneh.index.min()).days
-            if span_days < self.cfg.min_1h_days:
-                log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="INSUFFICIENT_1H_SPAN")
-                return False
+        daily = aggregate_1d_from_1h(oneh)
+        if daily is None or len(daily) < 20:
+            log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="NO_DERIVED_DAILY")
+            return False
 
         return True

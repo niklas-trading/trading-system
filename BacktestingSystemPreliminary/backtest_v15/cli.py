@@ -1,8 +1,8 @@
 from __future__ import annotations
 import argparse, os, time
 import logging
-from datetime import datetime
-from dataclasses import asdict
+from datetime import date, timedelta
+
 
 from .config import UniverseConfig, DataConfig, AggregationConfig, SlippageConfig, RiskConfig, StrategyConfig, RegimeConfig
 from .data import YFDataLoader
@@ -12,10 +12,23 @@ from .reporting import save_run
 from .logging import setup_logging, log_kv
 
 def cmd_run(args):
-    # Multi-level project logging (console=INFO, file=DEBUG; overwrites per run)
-    setup_logging(overwrite=True)
+
+    # Run-ID und Run-Ordner direkt zu Beginn festlegen
+    run_id = time.strftime("%Y%m%d-%H%M%S")
+    run_dir = os.path.join(args.out_dir, run_id)
+    log_dir = os.path.join(run_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    setup_logging(log_dir=log_dir, overwrite=True, max_bytes = 250_000_000, backup_count=2)
     logger = logging.getLogger(__name__)
-    log_kv(logger, logging.INFO, "RUN_START", start=args.start, end=args.end, sample=args.sample, tickers_file=args.tickers_file)
+
+    # timeframe is dynamically set so it can get the oldest hourly data available with yfinance (730 days ago)
+    start=date.today()-timedelta(days=365)
+    end=date.today()
+
+    log_kv(logger, logging.INFO, "RUN_START", start=start, end=end, sample=args.sample, tickers_file=args.tickers_file)
+    # Setup
+
     ucfg = UniverseConfig(
         min_price=args.min_price,
         min_avg_dollar_vol_20d=args.min_dvol,
@@ -31,24 +44,26 @@ def cmd_run(args):
     loader = YFDataLoader(dcfg)
     ub = UniverseBuilder(ucfg, loader)
 
+    # build universe
+
     tickers = ub.read_tickers_file(args.tickers_file)
     universe = ub.build_random_sample(
         tickers=tickers,
-        start=args.start,
-        end=args.end,
+        start=start,
+        end=end,
         sample_size=args.sample,
         seed=args.sample_seed,
     )
     universe_tickers = [u.ticker for u in universe]
 
-    bt = Backtester(loader, acfg, scfg, slip, rcfg, regcfg)
-    pf = bt.run(universe_tickers, BacktestParams(start=args.start, end=args.end, initial_equity=args.initial_equity))
+    # run backtest
 
-    run_id = time.strftime("%Y%m%d-%H%M%S")
-    run_dir = os.path.join(args.out_dir, run_id)
+    bt = Backtester(loader, acfg, scfg, slip, rcfg, regcfg)
+    pf = bt.run(universe_tickers, BacktestParams(start=start, end=end, initial_equity=args.initial_equity))
+
     params = {
-        "start": args.start,
-        "end": args.end,
+        "start": start,
+        "end": end,
         "initial_equity": args.initial_equity,
         "tickers_file": args.tickers_file,
         "sample": args.sample,
@@ -70,8 +85,6 @@ def build_parser():
 
     r = sub.add_parser("run")
     r.add_argument("--tickers-file", required=True, help="One ticker per line.")
-    r.add_argument("--start", required=True, help="YYYY-MM-DD")
-    r.add_argument("--end", required=True, help="YYYY-MM-DD")
     r.add_argument("--sample", type=int, default=100)
     r.add_argument("--sample-seed", type=int, default=42)
     r.add_argument("--initial-equity", type=float, default=10000.0)

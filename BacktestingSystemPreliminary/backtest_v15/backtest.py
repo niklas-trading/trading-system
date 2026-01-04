@@ -63,10 +63,6 @@ class Backtester:
                 continue
             bars_4h[t] = b4
 
-            dd = self.loader.get_ohlcv(t, start=params.start, end=params.end, interval="1d")
-            if dd is not None and len(dd) > 0:
-                daily[t] = dd
-
         if len(bars_4h) == 0:
             raise RuntimeError("No instruments with sufficient 4H data.")
 

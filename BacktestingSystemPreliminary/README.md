@@ -47,7 +47,7 @@ Important:
 ### 3. Run the backtest
 
 ```bash
-python -m backtest_v15.cli run --tickers-file tickers.txt --start 2024-01-01 --end 2025-12-31 --sample 100
+python -m backtest_v15.cli run --tickers-file tickers.txt --sample 100
 ```
 
 What happens internally:
