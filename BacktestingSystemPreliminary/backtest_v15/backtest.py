@@ -1,14 +1,14 @@
 from __future__ import annotations
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List
 import pandas as pd
 from tqdm import tqdm
 
 from .config import StrategyConfig, SlippageConfig, RiskConfig, AggregationConfig, RegimeConfig
 from .logging import log_kv
 logger = logging.getLogger(__name__)
-from .data import YFDataLoader
+from .data import YFDataLoader, aggregate_1d_from_1h
 from .aggregation import BarAggregator
 from .features import FeatureBuilder
 from .catalyst import CatalystEngine
@@ -61,6 +61,10 @@ class Backtester:
             if b4 is None or len(b4) < 200:
                 log_kv(logger, logging.DEBUG, "BT_TICKER_SKIP", ticker=t, reason="INSUFFICIENT_4H_BARS", bars_4h=(0 if b4 is None else len(b4)))
                 continue
+
+            d1 = aggregate_1d_from_1h(d1h)
+            if d1 is not None and len(d1) > 0:
+                daily[t] = d1
             bars_4h[t] = b4
 
         if len(bars_4h) == 0:
@@ -115,21 +119,27 @@ class Backtester:
                 i = df.index.get_loc(ts)
                 feat = self.feats.snapshot(df, i)
 
-                # catalyst requires daily data; if missing -> treat as no catalyst
                 dd = daily.get(t)
-                if dd is None or len(dd) == 0:
-                    continue
                 cat = self.catalyst.get_earnings_catalyst(
                     t, dd, asof=ts, max_age_days=self.strategy.cfg.catalyst_max_age_days
                 )
 
                 sig = self.strategy.evaluate(df, i, feat, cat, in_position=False)
                 if sig.type != SignalType.ENTRY:
+                    if getattr(sig, "reasons", None):
+                        log_kv(
+                            logger,
+                            logging.DEBUG,
+                            "ENTRY_REJECT",
+                            ticker=t,
+                            ts=str(ts),
+                            reasons="|".join(sig.reasons),
+                        )
                     continue
-
                 # Long-only rule: no new trades in Defensiv regime
                 regime = get_regime(ts)
                 if regime == "Defensiv":
+                    log_kv(logger, logging.DEBUG, "ENTRY_BLOCKED_REGIME", ticker=t, ts=str(ts), regime=regime)
                     continue
 
                 # risk pct and size

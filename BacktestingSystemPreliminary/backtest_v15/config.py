@@ -3,39 +3,9 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class UniverseConfig:
-    """Configuration for the UniverseBuilder.
 
-    In the original implementation the universe pre‑screener applied
-    additional liquidity filters on top of basic data hygiene (minimum
-    price, minimum average dollar volume and a long lookback for
-    intraday data).  These filters are not part of the user's trading
-    rules described in `swing_trading_strategie_v_1_5.md` and would
-    incorrectly bias the backtest by excluding otherwise valid
-    instruments.  To honour the user's request to test the strategy
-    exactly as specified, the defaults below disable those filters by
-    setting them to zero.  Callers may override these values if they
-    wish to apply stricter hygiene.
-    """
-
-    # Do not exclude tickers based on price by default.  Any positive
-    # value here will enforce a minimum last close.  Set to zero to
-    # accept all prices.
     min_price: float = 0.0
-
-    # Do not exclude tickers based on average daily dollar volume by
-    # default.  Any positive value here will enforce a minimum
-    # liquidity filter on the daily data.  Set to zero to accept all
-    # volumes.
-    min_avg_dollar_vol_20d: float = 0.0  # USD
-
-    # Minimum number of calendar days of 1H history required.  This
-    # controls how far back the UniverseBuilder will look for intraday
-    # data to ensure there is enough history to compute 4H features.
-    # Setting this to zero will cause the hygiene checker to only
-    # attempt a 30 day lookback (used for ATR and range) and will not
-    # exclude symbols solely because they lack a full year of intraday
-    # history.  This is useful when the user wants to test all NASDAQ
-    # symbols without imposing artificial history constraints.
+    min_avg_dollar_vol_20d: float = 0.0
     min_1h_days: int = 0
 
 @dataclass(frozen=True)
@@ -72,6 +42,7 @@ class StrategyConfig:
     range_5d_bars: int = 10     # 5 trading days * 2 blocks/day
     range_20d_bars: int = 40    # 20 trading days * 2 blocks/day
     catalyst_max_age_days: int = 10  # trading days
+    require_catalyst: bool = True
 
 @dataclass(frozen=True)
 class RegimeConfig:

@@ -26,11 +26,14 @@ class CatalystEngine:
         Classification K1/K2 uses a simplified daily reaction check.
 
         """
+        if daily is None or daily.empty:
+            log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_DAILY_BARS")
+            return CatalystInfo(False, "NONE", None)
+
         cal = self.loader.get_calendar(ticker)
         if cal is None:
             log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_CALENDAR")
-        log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_EARNINGS_IN_WINDOW")
-        return CatalystInfo(False, "NONE", None)
+            return CatalystInfo(False, "NONE", None)
 
         # attempt to find an earnings date
         earn_dt = None

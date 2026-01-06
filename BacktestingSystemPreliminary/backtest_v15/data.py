@@ -76,14 +76,7 @@ class YFDataLoader:
     def __post_init__(self) -> None:
         _safe_mkdir(self.cfg.cache_dir)
 
-    def get_ohlcv(
-            self,
-            ticker: str,
-            start: str | None,
-            end: str | None,
-            interval: str = "1d",
-            lookback_days: int | None = None,
-    ) -> pd.DataFrame | None:
+    def get_ohlcv(self, ticker: str, start: str | None, end: str | None, interval: str = "1d",lookback_days: int | None = None,) -> pd.DataFrame | None:
         """
         Fetch OHLCV data via yfinance with disk caching.
         """
@@ -186,3 +179,22 @@ class YFDataLoader:
                 pass
 
         return df
+
+    def get_calendar(self, ticker: str) -> Optional[pd.DataFrame]:
+        """
+        Return yfinance calendar data for a ticker as a DataFrame.
+        """
+        try:
+            t = yf.Ticker(ticker)
+            cal = t.calendar
+            if cal is None:
+                return None
+            # yfinance may return Series or DataFrame depending on version
+            if isinstance(cal, pd.Series):
+                cal = cal.to_frame().T
+            if isinstance(cal, pd.DataFrame) and not cal.empty:
+                return cal
+            return None
+        except Exception as e:
+            log_kv(logger, logging.DEBUG, "DATA_CALENDAR_FAIL", ticker=ticker, err=str(e))
+            return None

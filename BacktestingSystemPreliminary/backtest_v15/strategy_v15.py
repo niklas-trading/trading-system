@@ -51,13 +51,15 @@ class StrategyV15:
                 vol_ok = True
             if not vol_ok:
                 reasons.append("VOL_FILTER_FAIL")
-            # 3) Catalyst required
-            if not cat.has_catalyst:
+            # 3) Catalyst required (optional via config)
+            if not cat.has_catalyst and self.cfg.require_catalyst:
                 reasons.append("NO_CATALYST")
             # 4) Pullback rules
-            if feat.pullback_bars < self.cfg.pullback_min_bars:
+            if feat.pullback_bars is None:
+                reasons.append("NO_PULLBACK")
+            elif feat.pullback_bars < self.cfg.pullback_min_bars:
                 reasons.append("PULLBACK_TOO_SHORT")
-            if feat.pullback_retrace is None or feat.pullback_retrace > self.cfg.pullback_max_retrace:
+            elif feat.pullback_retrace is None or feat.pullback_retrace > self.cfg.pullback_max_retrace:
                 reasons.append("PULLBACK_TOO_DEEP")
             # 5) Structural stop: no close under last HL
             if feat.last_hl_close is None:
