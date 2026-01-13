@@ -59,9 +59,9 @@ def cmd_run(args):
     aggregator = BarAggregator(acfg)
 
     # build universe
-    tickers = ub.read_tickers_file(args.tickers_file)
-    tickers = list(dict.fromkeys([t.strip() for t in tickers if t.strip()]))
-    rnd = random.Random(args.sample_seed)
+    all_tickers = ub.read_tickers_file(args.tickers_file)
+    all_tickers = list(dict.fromkeys([t.strip() for t in all_tickers if t.strip()]))
+    tickers = random.choices(all_tickers, k=args.sample)
 
     bars_4h ={}
     daily = {}
@@ -72,8 +72,6 @@ def cmd_run(args):
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {}
         for t in tickers:
-            if t.upper().endswith(("W", "WS", "U", "R")):
-                continue
             futures[ex.submit(_prepare_ticker, loader, aggregator, t, start, end, logger)] = t
 
             if len(futures) >= max_workers * 3 and len(accepted) >= args.sample:
