@@ -1,15 +1,32 @@
 from __future__ import annotations
 import argparse, os, time
 import logging
+import random
 from datetime import date, timedelta
 
-
 from .config import UniverseConfig, DataConfig, AggregationConfig, SlippageConfig, RiskConfig, StrategyConfig, RegimeConfig
-from .data import YFDataLoader
+from .data import YFDataLoader, aggregate_1d_from_1h
 from .universe import UniverseBuilder
 from .backtest import Backtester, BacktestParams
 from .reporting import save_run
 from .logging import setup_logging, log_kv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from .aggregation import BarAggregator
+
+def _prepare_ticker(loader, aggregator, ticker, start, end, logger):
+    try:
+        d1h = loader.get_ohlcv(ticker, start=start, end=end, interval="1h")
+        if d1h is None or len(d1h) == 0:
+            return ticker, None, None, None
+        b4 = aggregator.to_4h_session_aware(d1h)
+        if b4 is None or len(b4) < 200:
+            return ticker, None, None, None
+        d1 = aggregate_1d_from_1h(d1h)
+        return ticker, d1h, b4, d1
+    except Exception as e:
+        log_kv(logger, logging.WARN, "PREP_FAIL", ticker=ticker, exception=e)
+        return ticker, None, None, None
+
 
 def cmd_run(args):
 
@@ -29,11 +46,7 @@ def cmd_run(args):
     log_kv(logger, logging.INFO, "RUN_START", start=start, end=end, sample=args.sample, tickers_file=args.tickers_file)
     # Setup
 
-    ucfg = UniverseConfig(
-        min_price=args.min_price,
-        min_avg_dollar_vol_20d=args.min_dvol,
-        min_1h_days=args.min_1h_days,
-    )
+    ucfg = UniverseConfig(min_price=args.min_price,min_avg_dollar_vol_20d=args.min_dvol,min_1h_days=args.min_1h_days)
     dcfg = DataConfig(cache_dir=args.cache_dir, auto_adjust=True, max_workers=6)
     acfg = AggregationConfig()
     scfg = StrategyConfig()
@@ -43,23 +56,52 @@ def cmd_run(args):
 
     loader = YFDataLoader(dcfg)
     ub = UniverseBuilder(ucfg, loader)
+    aggregator = BarAggregator(acfg)
 
     # build universe
-
     tickers = ub.read_tickers_file(args.tickers_file)
-    universe = ub.build_random_sample(
-        tickers=tickers,
-        start=start,
-        end=end,
-        sample_size=args.sample,
-        seed=args.sample_seed,
-    )
-    universe_tickers = [u.ticker for u in universe]
+    tickers = list(dict.fromkeys([t.strip() for t in tickers if t.strip()]))
+    rnd = random.Random(args.sample_seed)
+
+    bars_4h ={}
+    daily = {}
+    accepted = []
+    tested = 0
+
+    max_workers = 6
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {}
+        for t in tickers:
+            if t.upper().endswith(("W", "WS", "U", "R")):
+                continue
+            futures[ex.submit(_prepare_ticker, loader, aggregator, t, start, end, logger)] = t
+
+            if len(futures) >= max_workers * 3 and len(accepted) >= args.sample:
+                break
+
+        for fut in as_completed(futures):
+            t = futures[fut]
+            tested += 1
+            ticker, d1h, b4, d1 = fut.result()
+
+            if b4 is None or d1 is None:
+                continue
+
+            if ub._passes_hygiene(ticker=ticker, oneh=d1h, daily=d1):
+                accepted.append(t)
+                bars_4h[t] = b4
+                daily[t] = d1
+
+            if len(accepted) >= args.sample:
+                break
+
+        if len(accepted) < args.sample:
+            raise RuntimeError(f"Universe too small: {len(accepted)} < {args.sample}")
 
     # run backtest
 
     bt = Backtester(loader, acfg, scfg, slip, rcfg, regcfg)
-    pf = bt.run(universe_tickers, BacktestParams(start=start, end=end, initial_equity=args.initial_equity))
+    pf = bt.run(bars_4h=bars_4h, daily=daily, params=BacktestParams(start=start, end=end, initial_equity=args.initial_equity))
 
     params = {
         "start": start,
@@ -73,7 +115,6 @@ def cmd_run(args):
         "min_1h_days": args.min_1h_days,
         "slippage": {"seed": args.slip_seed, "max_atr_frac": args.slip_atr_frac},
         "regime_ref": args.regime_ref,
-        "universe_tickers": universe_tickers,
     }
     save_run(run_dir, pf, params)
     print(f"Run saved to: {run_dir}")
@@ -90,6 +131,7 @@ def build_parser():
     r.add_argument("--initial-equity", type=float, default=10000.0)
     r.add_argument("--cache-dir", default="cache")
     r.add_argument("--out-dir", default="runs")
+    r.add_argument("--max-workers", type=int, default=6, help="Parallel downloads/prepare workers (ThreadPoolExecutor).")
 
     # hygiene
     #
@@ -118,3 +160,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

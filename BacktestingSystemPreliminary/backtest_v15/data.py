@@ -76,6 +76,24 @@ class YFDataLoader:
     def __post_init__(self) -> None:
         _safe_mkdir(self.cfg.cache_dir)
 
+    @staticmethod
+    def _normalize_ohlcv(df: pd.DataFrame, ticker: str | None = None) -> pd.DataFrame:
+        if isinstance(df.columns, pd.MultiIndex):
+            levels = df.columns.names
+            # robust: versuche in letzter Ebene den ticker zu finden
+            if ticker in df.columns.get_level_values(-1):
+                df = df.xs(ticker, axis=1, level=-1, drop_level=True)
+            else:
+                # fallback: nimm Level 0 nur wenn du sicher bist, dass es nur einen Ticker ist
+                df.columns = [c[0] for c in df.columns]
+
+        df = df.rename(columns={c: str(c).lower() for c in df.columns})
+        keep = [c for c in ["open","high","low","close","volume"] if c in df.columns]
+        df = df[keep].copy()
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+        df.index = pd.to_datetime(df.index)
+        return df
+
     def get_ohlcv(self, ticker: str, start: str | None, end: str | None, interval: str = "1d",lookback_days: int | None = None,) -> pd.DataFrame | None:
         """
         Fetch OHLCV data via yfinance with disk caching.
@@ -86,15 +104,7 @@ class YFDataLoader:
         end_eff = pd.Timestamp(end).normalize()
 
         if start_eff is not None and end_eff is not None and start_eff >= end_eff:
-            log_kv(
-                logger,
-                logging.WARNING,
-                "DATA_WINDOW_INVALID",
-                ticker=ticker,
-                interval=interval_l,
-                start=str(start_eff),
-                end=str(end_eff),
-            )
+            log_kv(logger,logging.WARNING,"DATA_WINDOW_INVALID",ticker=ticker,interval=interval_l,start=str(start_eff),end=str(end_eff),)
             return None
 
         cache_path = None
@@ -106,59 +116,25 @@ class YFDataLoader:
             cache_name = f"{safe_ticker}__{interval_l}__{start_key}__{end_key}.parquet"
             cache_path = os.path.join(self.cfg.cache_dir, cache_name)
 
-            if os.path.exists(cache_path):
-                try:
-                    df = pd.read_parquet(cache_path)
-                    log_kv(
-                        logger,
-                        logging.DEBUG,
-                        "DATA_CACHE_HIT",
-                        ticker=ticker,
-                        interval=interval_l,
-                        path=cache_path,
-                        rows=len(df),
-                    )
-                    return df
-                except Exception as e:
-                    log_kv(
-                        logger,
-                        logging.WARNING,
-                        "DATA_CACHE_READ_FAIL",
-                        ticker=ticker,
-                        interval=interval_l,
-                        path=cache_path,
-                        err=str(e),
-                    )
+            pattern = rf"^{re.escape(safe_ticker)}__{re.escape(interval_l)}__.*__.*\.parquet$"
+
+            log_kv(logger,logging.INFO,"SEARCHING_CACHE",ticker=ticker)
+
+            for filename in os.listdir(self.cfg.cache_dir):
+                if re.search(pattern, filename):
+                    try:
+                        df = self._normalize_ohlcv(pd.read_parquet(os.path.join(self.cfg.cache_dir, filename)))
+                        log_kv(logger,logging.DEBUG,"DATA_CACHE_HIT",ticker=ticker,interval=interval_l,path=cache_path,rows=len(df),)
+                        return df
+                    except Exception as e:
+                        log_kv(logger,logging.WARNING,"DATA_CACHE_READ_FAIL",ticker=ticker,interval=interval_l,path=cache_path,err=str(e),)
+
 
         try:
-            log_kv(
-                logger,
-                logging.DEBUG,
-                "DATA_DOWNLOAD",
-                ticker=ticker,
-                interval=interval_l,
-                start=str(start_eff),
-                end=str(end_eff),
-            )
-            df = yf.download(
-                tickers=ticker,
-                start=start_eff,
-                end=end_eff,
-                interval=interval_l,
-                group_by="column",
-                auto_adjust=False,
-                progress=False,
-                threads=False,
-            )
+            log_kv(logger,logging.DEBUG,"DATA_DOWNLOAD",ticker=ticker,interval=interval_l,start=str(start_eff),end=str(end_eff),)
+            df = yf.download(tickers=ticker,start=start_eff,end=end_eff,interval=interval_l,group_by="column",auto_adjust=False,progress=False,threads=False,)
         except Exception as e:
-            log_kv(
-                logger,
-                logging.WARNING,
-                "DATA_DOWNLOAD_FAIL",
-                ticker=ticker,
-                interval=interval_l,
-                err=str(e),
-            )
+            log_kv(logger,logging.WARNING,"DATA_DOWNLOAD_FAIL",ticker=ticker,interval=interval_l,err=str(e),)
             df = None
 
         if df is None or len(df) == 0:
@@ -174,6 +150,7 @@ class YFDataLoader:
 
         if cache_path is not None:
             try:
+                df = self._normalize_ohlcv(df)
                 df.to_parquet(cache_path, index=True)
             except Exception:
                 pass

@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, List
 import pandas as pd
+from pandas import Series
 from tqdm import tqdm
 
 from .config import StrategyConfig, SlippageConfig, RiskConfig, AggregationConfig, RegimeConfig
@@ -18,6 +19,16 @@ from .portfolio import Portfolio
 from .types import Position, SignalType
 from .regime import RegimeEngine
 
+# helper to map intraday ts to daily regime (use date in local tz if tz-aware)
+def get_regime(ts: pd.Timestamp, regime_daily: pd.Series) -> str:
+    d = ts.tz_localize(None).normalize()
+    if d in regime_daily.index:
+        v = regime_daily.loc[d]
+        return str(v) if pd.notna(v) else "Neutral"
+    # if missing, forward fill
+    prior = regime_daily.loc[:d].dropna()
+    return str(prior.iloc[-1]) if len(prior) else "Neutral"
+
 @dataclass
 class BacktestParams:
     start: str
@@ -25,15 +36,7 @@ class BacktestParams:
     initial_equity: float = 10_000.0
 
 class Backtester:
-    def __init__(
-        self,
-        loader: YFDataLoader,
-        agg_cfg: AggregationConfig,
-        strat_cfg: StrategyConfig,
-        slip_cfg: SlippageConfig,
-        risk_cfg: RiskConfig,
-        regime_cfg: RegimeConfig,
-    ):
+    def __init__(self,loader: YFDataLoader,agg_cfg: AggregationConfig,strat_cfg: StrategyConfig,slip_cfg: SlippageConfig,risk_cfg: RiskConfig,regime_cfg: RegimeConfig,):
         self.loader = loader
         self.aggregator = BarAggregator(agg_cfg)
         self.feats = FeatureBuilder(strat_cfg)
@@ -43,56 +46,25 @@ class Backtester:
         self.risk = RiskEngine(risk_cfg)
         self.regime_engine = RegimeEngine(regime_cfg, loader)
 
-    def run(self, tickers: List[str], params: BacktestParams, show_progress: bool = True) -> Portfolio:
-        log_kv(logger, logging.INFO, "BACKTEST_START", tickers=len(tickers), start=params.start, end=params.end)
+    def run(self, bars_4h: dict[str, pd.DataFrame], daily: dict[str, pd.DataFrame], params: BacktestParams, show_progress: bool = True) -> Portfolio:
+        log_kv(logger, logging.INFO, "BACKTEST_START", tickers=len(bars_4h), start=params.start, end=params.end)
         # regime feed (daily), later mapped to intraday timestamps
-        regime_daily = self.regime_engine.compute_weekly_regime(params.start, params.end)
-
-        # load & aggregate all tickers
-        bars_4h: Dict[str, pd.DataFrame] = {}
-        daily: Dict[str, pd.DataFrame] = {}
-        for t in tqdm(tickers, disable=not show_progress, desc="Downloading"):
-            log_kv(logger, logging.DEBUG, "BT_TICKER_DOWNLOAD", ticker=t)
-            d1h = self.loader.get_ohlcv(t, start=params.start, end=params.end, interval="1h")
-            if d1h is None or len(d1h) == 0:
-                log_kv(logger, logging.DEBUG, "BT_TICKER_SKIP", ticker=t, reason="NO_1H_DATA")
-                continue
-            b4 = self.aggregator.to_4h_session_aware(d1h)
-            if b4 is None or len(b4) < 200:
-                log_kv(logger, logging.DEBUG, "BT_TICKER_SKIP", ticker=t, reason="INSUFFICIENT_4H_BARS", bars_4h=(0 if b4 is None else len(b4)))
-                continue
-
-            d1 = aggregate_1d_from_1h(d1h)
-            if d1 is not None and len(d1) > 0:
-                daily[t] = d1
-            bars_4h[t] = b4
-
-        if len(bars_4h) == 0:
-            raise RuntimeError("No instruments with sufficient 4H data.")
+        regime_daily_for_ticker: dict[str, Series] = self.regime_engine.compute_weekly_regime(daily=daily)
 
         # build global event timeline
         all_ts = sorted(set().union(*[set(df.index) for df in bars_4h.values()]))
         portfolio = Portfolio(equity=params.initial_equity, equity_high=params.initial_equity)
 
-        # helper to map intraday ts to daily regime (use date in local tz if tz-aware)
-        def get_regime(ts: pd.Timestamp) -> str:
-            d = ts.tz_localize(None).normalize()
-            if d in regime_daily.index:
-                v = regime_daily.loc[d]
-                return str(v) if pd.notna(v) else "Neutral"
-            # if missing, forward fill
-            prior = regime_daily.loc[:d].dropna()
-            return str(prior.iloc[-1]) if len(prior) else "Neutral"
+        next_i = {t: 0 for t in bars_4h}
 
         # main loop
-        it = tqdm(all_ts, disable=not show_progress, desc="Backtest")
-        for ts in it:
+        for ts in all_ts:
             # 1) exits first
             for t, pos in list(portfolio.positions.items()):
                 df = bars_4h.get(t)
-                if df is None or ts not in df.index:
+                i = next_i.get(t, 0)
+                if df is None or i >= len(df) or df.index[i] != ts:
                     continue
-                i = df.index.get_loc(ts)
                 close = float(df["close"].iloc[i])
                 feat = self.feats.snapshot(df, i)
 
@@ -102,21 +74,30 @@ class Backtester:
                     portfolio.close_position(t, ts, exit_px, reason="STOP_CLOSE")
                     continue
                 # strategy-based exit on trend break
-                sig = self.strategy.evaluate(df, i, feat, cat=self.catalyst.get_earnings_catalyst(
-                    t, daily.get(t, pd.DataFrame()), asof=ts, max_age_days=self.strategy.cfg.catalyst_max_age_days
-                ), in_position=True)
-                if sig.type == SignalType.EXIT:
-                    exit_px = self.slip.apply(close, feat.atr, side="sell")
-                    portfolio.close_position(t, ts, exit_px, reason="TREND_BREAK")
-                    continue
+                else:
+                    sig = self.strategy.evaluate(
+                        df, i, feat,
+                        cat=self.catalyst.get_earnings_catalyst(
+                            t, daily.get(t, pd.DataFrame()), asof=ts,
+                            max_age_days=self.strategy.cfg.catalyst_max_age_days
+                        ),
+                        in_position=True
+                    )
+                    if sig.type == SignalType.EXIT:
+                        exit_px = self.slip.apply(close, feat.atr, side="sell")
+                        portfolio.close_position(t, ts, exit_px, reason="TREND_BREAK")
+                        exited = True
+
+                next_i[t] = i + 1
 
             # 2) entries
             for t, df in bars_4h.items():
                 if t in portfolio.positions:
                     continue
-                if ts not in df.index:
+                i = next_i[t]
+                if i >= len(df) or df.index[i] != ts:
                     continue
-                i = df.index.get_loc(ts)
+
                 feat = self.feats.snapshot(df, i)
 
                 dd = daily.get(t)
@@ -127,19 +108,14 @@ class Backtester:
                 sig = self.strategy.evaluate(df, i, feat, cat, in_position=False)
                 if sig.type != SignalType.ENTRY:
                     if getattr(sig, "reasons", None):
-                        log_kv(
-                            logger,
-                            logging.DEBUG,
-                            "ENTRY_REJECT",
-                            ticker=t,
-                            ts=str(ts),
-                            reasons="|".join(sig.reasons),
-                        )
+                        log_kv(logger,logging.DEBUG,"ENTRY_REJECT",ticker=t,ts=str(ts),reasons="|".join(sig.reasons),)
+                    next_i[t] = i + 1
                     continue
                 # Long-only rule: no new trades in Defensiv regime
-                regime = get_regime(ts)
+                regime = get_regime(ts, regime_daily_for_ticker[t])
                 if regime == "Defensiv":
                     log_kv(logger, logging.DEBUG, "ENTRY_BLOCKED_REGIME", ticker=t, ts=str(ts), regime=regime)
+                    next_i[t] = i + 1
                     continue
 
                 # risk pct and size
@@ -171,6 +147,8 @@ class Backtester:
                     catalyst_class=cat.catalyst_class,
                     regime=regime,
                 ))
+
+                next_i[t] = i + 1
 
         # close remaining at last available close
         last_ts = all_ts[-1]

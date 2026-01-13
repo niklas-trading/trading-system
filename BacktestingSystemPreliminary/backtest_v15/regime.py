@@ -11,13 +11,40 @@ from .indicators import sma, atr
 
 logger = logging.getLogger(__name__)
 
+def classify_daily_regime(d: pd.DataFrame) -> pd.Series:
+    """
+    Erwartet Spalten: close, SMA_F, SMA_S, ATR, ATR_MA
+    Gibt pd.Series[str|None] zurück (Index wie d.index).
+    """
+    # NaN-Guard (Indikatoren noch nicht “warmgelaufen”)
+    ready = (
+            d["SMA_F"].notna()
+            & d["SMA_S"].notna()
+            & d["ATR"].notna()
+            & d["ATR_MA"].notna()
+    )
+
+    out = pd.Series(index=d.index, dtype="object")
+    out.loc[~ready] = None
+
+    close = d["close"]
+
+    defensiv = ready & (close < d["SMA_S"])
+    expansion = ready & (close > d["SMA_F"]) & (d["ATR"] >= d["ATR_MA"])
+    neutral = ready & ~defensiv & ~expansion
+
+    out.loc[defensiv] = "Defensiv"
+    out.loc[expansion] = "Expansion"
+    out.loc[neutral] = "Neutral"
+
+    return out
 
 @dataclass
 class RegimeEngine:
     cfg: RegimeConfig
     loader: YFDataLoader
 
-    def compute_weekly_regime(self, start: str, end: str) -> pd.Series:
+    def compute_weekly_regime(self, daily: dict[str, pd.DataFrame]) -> dict[str, pd.Series]:
         """
         Returns a daily-indexed Series with regime values that are held constant
         for the next week.
@@ -27,81 +54,40 @@ class RegimeEngine:
         - Daily is derived from 1H
         - Regime computed on daily close (synthetic)
         """
+        regimes: dict[str, pd.Series] = {}
+        for ticker, df in daily.items():
+            if df is None or len(df) < max(
+                    self.cfg.sma_slow,
+                    self.cfg.atr_len + self.cfg.atr_ma_len,
+            ) + 10:
+                raise RuntimeError("Not enough derived daily data for regime computation.")
 
-        log_kv(
-            logger,
-            logging.INFO,
-            "REGIME_START",
-            ref=self.cfg.ref_ticker,
-            start=start,
-            end=end,
-        )
+            d = df.copy()
 
-        # 1) Load 1H data (ONLY source of truth)
-        oneh = self.loader.get_ohlcv(
-            self.cfg.ref_ticker,
-            start=start,
-            end=end,
-            interval="1h",
-        )
+            # 3) Indicators (close-only)
+            d["SMA_F"] = sma(d["close"], self.cfg.sma_fast)
+            d["SMA_S"] = sma(d["close"], self.cfg.sma_slow)
+            d["ATR"] = atr(d, self.cfg.atr_len)
+            d["ATR_MA"] = d["ATR"].rolling(self.cfg.atr_ma_len).mean()
 
-        if oneh is None or len(oneh) < 50:
-            raise RuntimeError("Not enough 1H data for regime computation.")
+            d["Regime_Daily"] = classify_daily_regime(d)
 
-        # 2) Aggregate synthetic Daily from 1H
-        df = aggregate_1d_from_1h(oneh)
-        if df is None or len(df) < max(
-                self.cfg.sma_slow,
-                self.cfg.atr_len + self.cfg.atr_ma_len,
-        ) + 10:
-            raise RuntimeError("Not enough derived daily data for regime computation.")
+            # 5) Weekly regime: use last close of each week (Fri)
+            d = d.dropna(subset=["Regime_Daily"])
+            d["Week"] = pd.to_datetime(d.index).to_period("W-FRI")
+            weekly = d.groupby("Week")["Regime_Daily"].last()
 
-        d = df.copy()
+            # 6) Expand weekly regime to daily index (applies to NEXT week)
+            daily_idx = pd.to_datetime(df.index)
+            out = pd.Series(index=daily_idx, dtype="object")
 
-        # 3) Indicators (close-only)
-        d["SMA_F"] = sma(d["close"], self.cfg.sma_fast)
-        d["SMA_S"] = sma(d["close"], self.cfg.sma_slow)
-        d["ATR"] = atr(d, self.cfg.atr_len)
-        d["ATR_MA"] = d["ATR"].rolling(self.cfg.atr_ma_len).mean()
+            weeks = daily_idx.to_period("W-FRI")
+            for w in weeks.unique():
+                reg = weekly.get(w, None)
+                next_w = w + 1
+                mask = weeks == next_w
+                if reg is not None:
+                    out.loc[mask] = reg
 
-        # 4) Daily regime classification (close-only)
-        def _reg(row):
-            if (
-                    pd.isna(row["SMA_F"])
-                    or pd.isna(row["SMA_S"])
-                    or pd.isna(row["ATR"])
-                    or pd.isna(row["ATR_MA"])
-            ):
-                return None
-
-            close = row["close"]
-
-            if close < row["SMA_S"]:
-                return "Defensiv"
-
-            if (close > row["SMA_F"]) and (row["ATR"] >= row["ATR_MA"]):
-                return "Expansion"
-
-            return "Neutral"
-
-        d["Regime_Daily"] = d.apply(_reg, axis=1)
-
-        # 5) Weekly regime: use last close of each week (Fri)
-        d = d.dropna(subset=["Regime_Daily"])
-        d["Week"] = pd.to_datetime(d.index).to_period("W-FRI")
-        weekly = d.groupby("Week")["Regime_Daily"].last()
-
-        # 6) Expand weekly regime to daily index (applies to NEXT week)
-        daily_idx = pd.to_datetime(df.index)
-        out = pd.Series(index=daily_idx, dtype="object")
-
-        weeks = daily_idx.to_period("W-FRI")
-        for w in weeks.unique():
-            reg = weekly.get(w, None)
-            next_w = w + 1
-            mask = weeks == next_w
-            if reg is not None:
-                out.loc[mask] = reg
-
-        out = out.ffill()
-        return out
+            regimes[ticker] = out.ffill()
+        return regimes

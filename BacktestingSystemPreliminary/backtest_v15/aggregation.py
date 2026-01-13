@@ -65,13 +65,15 @@ class BarAggregator:
 
         g = df.groupby("_block_end", sort=True)
 
-        out = pd.DataFrame({
-            "open": g["open"].first(),
-            "high": g["high"].max(),
-            "low":  g["low"].min(),
-            "close": g["close"].last(),
-            "volume": g["volume"].sum(),
-        })
+        out = (
+            g.agg(
+                open=("open", "first"),
+                high=("high", "max"),
+                low=("low", "min"),
+                close=("close", "last"),
+                volume=("volume", "sum"),
+            )
+        )
 
         out.index.name = "Timestamp"
         log_kv(logger, logging.DEBUG, "AGG_DONE", bars_4h=len(out))

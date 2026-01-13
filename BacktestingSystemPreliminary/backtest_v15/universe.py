@@ -36,14 +36,7 @@ class UniverseBuilder:
                 out.append(s)
         return out
 
-    def build_random_sample(
-            self,
-            tickers: Iterable[str],
-            start: str,
-            end: str,
-            sample_size: int = 100,
-            seed: int = 42,
-    ) -> List[UniverseItem]:
+    def build_random_sample(self,tickers: Iterable[str],oneh:pd.DataFrame, daily:pd.DataFrame,sample_size: int = 100,seed: int = 42,) -> List[UniverseItem]:
 
         tickers = list(dict.fromkeys(list(tickers)))
         rnd = random.Random(seed)
@@ -62,7 +55,7 @@ class UniverseBuilder:
                 rejected += 1
                 continue
 
-            if self._passes_hygiene(t, start, end):
+            if self._passes_hygiene(t, oneh, daily):
                 accepted.append(t)
                 log_kv(logger, logging.DEBUG, "UNIVERSE_ACCEPT", ticker=t, accepted=len(accepted))
             else:
@@ -71,15 +64,7 @@ class UniverseBuilder:
             if len(accepted) >= sample_size:
                 break
 
-        log_kv(
-            logger,
-            logging.INFO,
-            "UNIVERSE_SUMMARY",
-            requested=sample_size,
-            accepted=len(accepted),
-            tested=tested,
-            rejected=rejected,
-        )
+        log_kv(logger,logging.INFO,"UNIVERSE_SUMMARY",requested=sample_size,accepted=len(accepted),tested=tested,rejected=rejected,)
 
         if len(accepted) < sample_size:
             raise RuntimeError(
@@ -88,27 +73,8 @@ class UniverseBuilder:
 
         return [UniverseItem(t) for t in accepted]
 
-    def _passes_hygiene(self, ticker: str, start: str, end: str) -> bool:
-        """
-        Strategy-conform hygiene:
-        - load 1H data
-        - derive synthetic Daily from 1H
-        """
-
-        oneh = self.loader.get_ohlcv(
-            ticker=ticker,
-            start=start,
-            end=end,
-            interval="1h",
-        )
-
-        if oneh is None or len(oneh) < 50:
+    def _passes_hygiene(self, ticker: str, oneh: pd.DataFrame, daily:pd.DataFrame) -> bool:
+        if oneh is None or len(oneh) < 50 or daily is None or len(daily) < 20:
             log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="NO_1H_DATA")
             return False
-
-        daily = aggregate_1d_from_1h(oneh)
-        if daily is None or len(daily) < 20:
-            log_kv(logger, logging.DEBUG, "UNIVERSE_REJECT", ticker=ticker, reason="NO_DERIVED_DAILY")
-            return False
-
         return True
