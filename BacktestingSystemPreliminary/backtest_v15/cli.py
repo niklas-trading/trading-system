@@ -71,35 +71,37 @@ def cmd_run(args):
     max_workers = 6
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {}
-        for t in tickers:
-            futures[ex.submit(_prepare_ticker, loader, aggregator, t, start, end, logger)] = t
+        while len(accepted) < args.sample:
+            for t in tickers:
+                futures[ex.submit(_prepare_ticker, loader, aggregator, t, start, end, logger)] = t
 
-            if len(futures) >= max_workers * 3 and len(accepted) >= args.sample:
-                break
+                if len(futures) >= max_workers * 3 and len(accepted) >= args.sample:
+                    break
 
-        for fut in as_completed(futures):
-            t = futures[fut]
-            tested += 1
-            ticker, d1h, b4, d1 = fut.result()
+                for fut in as_completed(futures):
+                    t = futures[fut]
+                    tested += 1
+                    ticker, d1h, b4, d1 = fut.result()
 
-            if b4 is None or d1 is None:
-                continue
+                    if b4 is None or d1 is None:
+                        continue
 
-            if ub._passes_hygiene(ticker=ticker, oneh=d1h, daily=d1):
-                accepted.append(t)
-                bars_4h[t] = b4
-                daily[t] = d1
+                    if ub._passes_hygiene(ticker=ticker, oneh=d1h, daily=d1):
+                        accepted.append(t)
+                        bars_4h[t] = b4
+                        daily[t] = d1
 
-            if len(accepted) >= args.sample:
-                break
+                    if len(accepted) >= args.sample:
+                        break
+                if len(accepted) >= args.sample:
+                    tickers.append(random.choice(all_tickers))
 
-        if len(accepted) < args.sample:
-            raise RuntimeError(f"Universe too small: {len(accepted)} < {args.sample}")
+    # get earnings
+    cal = loader.get_calendar(start=start, end=end)
 
     # run backtest
-
     bt = Backtester(loader, acfg, scfg, slip, rcfg, regcfg)
-    pf = bt.run(bars_4h=bars_4h, daily=daily, params=BacktestParams(start=start, end=end, initial_equity=args.initial_equity))
+    pf = bt.run(bars_4h=bars_4h, daily=daily, cal = cal, params=BacktestParams(start=start, end=end, initial_equity=args.initial_equity))
 
     params = {
         "start": start,

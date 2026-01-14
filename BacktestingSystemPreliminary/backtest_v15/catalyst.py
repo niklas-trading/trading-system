@@ -19,7 +19,7 @@ class CatalystInfo:
 class CatalystEngine:
     loader: YFDataLoader
 
-    def get_earnings_catalyst(self, ticker: str, daily: pd.DataFrame, asof: pd.Timestamp, max_age_days: int = 10) -> CatalystInfo:
+    def get_earnings_catalyst(self, ticker: str, daily: pd.DataFrame, asof: pd.Timestamp, cal: pd.DataFrame, max_age_days: int = 10, ) -> CatalystInfo:
         log_kv(logger, logging.DEBUG, "CATALYST_CHECK", ticker=ticker, asof=str(asof.date()) if hasattr(asof,'date') else str(asof), max_age_days=max_age_days)
         """Uses yfinance calendar as a catalyst proxy (earnings date).
 
@@ -29,8 +29,6 @@ class CatalystEngine:
         if daily is None or daily.empty:
             log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_DAILY_BARS")
             return CatalystInfo(False, "NONE", None)
-
-        cal = self.loader.get_calendar(ticker)
         if cal is None:
             log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_CALENDAR")
             return CatalystInfo(False, "NONE", None)

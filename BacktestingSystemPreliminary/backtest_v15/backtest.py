@@ -46,12 +46,13 @@ class Backtester:
         self.risk = RiskEngine(risk_cfg)
         self.regime_engine = RegimeEngine(regime_cfg, loader)
 
-    def run(self, bars_4h: dict[str, pd.DataFrame], daily: dict[str, pd.DataFrame], params: BacktestParams, show_progress: bool = True) -> Portfolio:
+    def run(self, bars_4h: dict[str, pd.DataFrame], daily: dict[str, pd.DataFrame], cal: pd.DataFrame, params: BacktestParams, show_progress: bool = True) -> Portfolio:
         log_kv(logger, logging.INFO, "BACKTEST_START", tickers=len(bars_4h), start=params.start, end=params.end)
         # regime feed (daily), later mapped to intraday timestamps
         regime_daily_for_ticker: dict[str, Series] = self.regime_engine.compute_weekly_regime(daily=daily)
+        log_kv(logger, logging.INFO, "DAILY_REGIME_COMPUTED", tickers=len(bars_4h), start=params.start, end=params.end)
 
-        # build global event timeline
+    # build global event timeline
         all_ts = sorted(set().union(*[set(df.index) for df in bars_4h.values()]))
         portfolio = Portfolio(equity=params.initial_equity, equity_high=params.initial_equity)
 
@@ -72,21 +73,20 @@ class Backtester:
                 if close < float(pos.stop_close):
                     exit_px = self.slip.apply(close, feat.atr, side="sell")
                     portfolio.close_position(t, ts, exit_px, reason="STOP_CLOSE")
+                    log_kv(logger, logging.INFO, "STOP_CLOSE", ticker=t)
                     continue
                 # strategy-based exit on trend break
                 else:
                     sig = self.strategy.evaluate(
                         df, i, feat,
-                        cat=self.catalyst.get_earnings_catalyst(
-                            t, daily.get(t, pd.DataFrame()), asof=ts,
-                            max_age_days=self.strategy.cfg.catalyst_max_age_days
-                        ),
+                        cat=self.catalyst.get_earnings_catalyst(t, daily.get(t, pd.DataFrame()), asof=ts,max_age_days=self.strategy.cfg.catalyst_max_age_days,cal = cal),
                         in_position=True
                     )
                     if sig.type == SignalType.EXIT:
                         exit_px = self.slip.apply(close, feat.atr, side="sell")
                         portfolio.close_position(t, ts, exit_px, reason="TREND_BREAK")
-                        exited = True
+                        log_kv(logger, logging.INFO, "TREND_BREAK", ticker=t)
+                    exited = True
 
                 next_i[t] = i + 1
 
@@ -101,9 +101,7 @@ class Backtester:
                 feat = self.feats.snapshot(df, i)
 
                 dd = daily.get(t)
-                cat = self.catalyst.get_earnings_catalyst(
-                    t, dd, asof=ts, max_age_days=self.strategy.cfg.catalyst_max_age_days
-                )
+                cat = self.catalyst.get_earnings_catalyst(t, dd, asof=ts, max_age_days=self.strategy.cfg.catalyst_max_age_days, cal = cal)
 
                 sig = self.strategy.evaluate(df, i, feat, cat, in_position=False)
                 if sig.type != SignalType.ENTRY:
@@ -147,6 +145,7 @@ class Backtester:
                     catalyst_class=cat.catalyst_class,
                     regime=regime,
                 ))
+                log_kv(logger, logging.INFO, "OPEN_POSITION", ticker=t)
 
                 next_i[t] = i + 1
 
@@ -162,6 +161,7 @@ class Backtester:
             close = float(df["close"].iloc[i])
             exit_px = self.slip.apply(close, feat.atr, side="sell")
             portfolio.close_position(t, ts, exit_px, reason="EOD_FORCE")
+            log_kv(logger, logging.INFO, "EOD_FORCE", ticker=t)
 
         log_kv(logger, logging.INFO, "BACKTEST_DONE", trades=len(portfolio.trades), equity=portfolio.equity)
         return portfolio
