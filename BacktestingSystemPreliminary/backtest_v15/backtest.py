@@ -21,7 +21,7 @@ from .regime import RegimeEngine
 
 # helper to map intraday ts to daily regime (use date in local tz if tz-aware)
 def get_regime(ts: pd.Timestamp, regime_daily: pd.Series) -> str:
-    d = ts.tz_localize(None).normalize()
+    d = ts # .tz_localize(None).normalize()
     if d in regime_daily.index:
         v = regime_daily.loc[d]
         return str(v) if pd.notna(v) else "Neutral"

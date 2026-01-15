@@ -36,7 +36,7 @@ class Portfolio:
         self.equity_high = max(self.equity_high, self.equity)
 
     def open_position(self, pos: Position) -> None:
-        log_kv(logger, logging.INFO, "PORTFOLIO_OPEN", ticker=pos.ticker, entry_price=pos.entry_price, size=pos.size, stop=pos.stop)
+        log_kv(logger, logging.INFO, "PORTFOLIO_OPEN", ticker=pos.ticker, entry_price=pos.entry_price, size=pos.size, stop=pos.stop_close)
         self.positions[pos.ticker] = pos
 
     def close_position(self, ticker: str, ts, exit_price: float, reason: str) -> None:

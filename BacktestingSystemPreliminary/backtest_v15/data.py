@@ -6,8 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
-import datetime
-
+from datetime import datetime
 import pandas as pd
 import yfinance as yf
 
@@ -163,7 +162,7 @@ class YFDataLoader:
         Return yfinance calendar data for a ticker as a DataFrame.
         """
         try:
-            cal = yf.Calendars(start=datetime.strptime(start, "%Y-%m-%d"), end=datetime.strptime(end, "%Y-%m-%d"))
+            cal = yf.Calendars(start=start, end=end)
             cal = cal.get_earnings_calendar(market_cap=10_000_000)
             if cal is None:
                 return None
