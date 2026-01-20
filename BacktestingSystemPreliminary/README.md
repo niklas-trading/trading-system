@@ -47,7 +47,7 @@ Important:
 ### 3. Run the backtest
 
 ```bash
-python -m backtest_v15.cli run --tickers-file tickers.txt --sample 1000
+python -m backtest_v15.cli run --tickers-file tickers.txt --sample 1
 ```
 
 What happens internally:

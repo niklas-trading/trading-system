@@ -55,13 +55,22 @@ class BarAggregator:
 
         df["_block"] = (df["_time"] >= split_t).astype(int)
 
-        # block end timestamp: set to split_time or close_time in local tz
-        def _block_end(row):
-            t = split_t if row["_block"] == 0 else close_t
-            # combine date + time and localize
-            return tz.localize(pd.Timestamp.combine(row["_date"], t))
+        # block end timestamp: set to split_time or close_time in local tz (vectorized)
+        # df["_ts_local"] is already tz-aware in `tz`, so we can build "midnight + offset"
+        # without per-row tz.localize().
+        date_midnight = df["_ts_local"].dt.normalize()
 
-        df["_block_end"] = df.apply(_block_end, axis=1)
+        split_off = (
+                pd.to_timedelta(split_t.hour, unit="h")
+                + pd.to_timedelta(split_t.minute, unit="m")
+        )
+        close_off = (
+                pd.to_timedelta(close_t.hour, unit="h")
+                + pd.to_timedelta(close_t.minute, unit="m")
+        )
+
+        df["_block_end"] = date_midnight + split_off
+        df.loc[df["_block"] == 1, "_block_end"] = date_midnight + close_off
 
         g = df.groupby("_block_end", sort=True)
 

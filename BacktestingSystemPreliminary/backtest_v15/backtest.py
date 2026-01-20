@@ -1,10 +1,9 @@
 from __future__ import annotations
 import logging
 from dataclasses import dataclass
-from typing import Dict, List
+from datetime import date
 import pandas as pd
 from pandas import Series
-from tqdm import tqdm
 
 from .config import StrategyConfig, SlippageConfig, RiskConfig, AggregationConfig, RegimeConfig
 from .logging import log_kv
@@ -31,8 +30,8 @@ def get_regime(ts: pd.Timestamp, regime_daily: pd.Series) -> str:
 
 @dataclass
 class BacktestParams:
-    start: str
-    end: str
+    start: date
+    end: date
     initial_equity: float = 10_000.0
 
 class Backtester:
@@ -46,13 +45,13 @@ class Backtester:
         self.risk = RiskEngine(risk_cfg)
         self.regime_engine = RegimeEngine(regime_cfg, loader)
 
-    def run(self, bars_4h: dict[str, pd.DataFrame], daily: dict[str, pd.DataFrame], cal: pd.DataFrame, params: BacktestParams, show_progress: bool = True) -> Portfolio:
+    def run(self, bars_4h: dict[str, pd.DataFrame], daily: dict[str, pd.DataFrame], params: BacktestParams, show_progress: bool = True) -> Portfolio:
         log_kv(logger, logging.INFO, "BACKTEST_START", tickers=len(bars_4h), start=params.start, end=params.end)
         # regime feed (daily), later mapped to intraday timestamps
         regime_daily_for_ticker: dict[str, Series] = self.regime_engine.compute_weekly_regime(daily=daily)
         log_kv(logger, logging.INFO, "DAILY_REGIME_COMPUTED", tickers=len(bars_4h), start=params.start, end=params.end)
 
-    # build global event timeline
+        # build global event timeline
         all_ts = sorted(set().union(*[set(df.index) for df in bars_4h.values()]))
         portfolio = Portfolio(equity=params.initial_equity, equity_high=params.initial_equity)
 
@@ -79,7 +78,7 @@ class Backtester:
                 else:
                     sig = self.strategy.evaluate(
                         df, i, feat,
-                        cat=self.catalyst.get_earnings_catalyst(t, daily.get(t, pd.DataFrame()), asof=ts,max_age_days=self.strategy.cfg.catalyst_max_age_days,cal = cal),
+                        cat=self.catalyst.get_earnings_catalyst(t, daily.get(t, pd.DataFrame()), current_ts=ts, cal=self.loader.get_calendar(ticker=t, start=params.start, end=params.end)),
                         in_position=True
                     )
                     if sig.type == SignalType.EXIT:
@@ -101,7 +100,7 @@ class Backtester:
                 feat = self.feats.snapshot(df, i)
 
                 dd = daily.get(t)
-                cat = self.catalyst.get_earnings_catalyst(t, dd, asof=ts, max_age_days=self.strategy.cfg.catalyst_max_age_days, cal = cal)
+                cat = self.catalyst.get_earnings_catalyst(t, dd, current_ts=ts, cal = self.loader.get_calendar(ticker=t, start=params.start, end=params.end))
 
                 sig = self.strategy.evaluate(df, i, feat, cat, in_position=False)
                 if sig.type != SignalType.ENTRY:

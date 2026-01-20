@@ -47,13 +47,13 @@ class StrategyV15:
                 vol_ok = True
             if feat.range5 is not None and feat.range20 is not None and feat.range20 > 0 and feat.range5 >= 1.3 * feat.range20:
                 vol_ok = True
-            #if cat.has_catalyst:
-            #    vol_ok = True
+            if cat.has_catalyst:
+                vol_ok = True
             if not vol_ok:
                 reasons.append("VOL_FILTER_FAIL")
             # 3) Catalyst required (optional via config)
-            #if not cat.has_catalyst and self.cfg.require_catalyst:
-            #    reasons.append("NO_CATALYST")
+            if not cat.has_catalyst and self.cfg.require_catalyst:
+                reasons.append("NO_CATALYST")
             # 4) Pullback rules
             if feat.pullback_bars is None:
                 reasons.append("NO_PULLBACK")

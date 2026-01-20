@@ -56,10 +56,7 @@ class RegimeEngine:
         """
         regimes: dict[str, pd.Series] = {}
         for ticker, df in daily.items():
-            if df is None or len(df) < max(
-                    self.cfg.sma_slow,
-                    self.cfg.atr_len + self.cfg.atr_ma_len,
-            ) + 10:
+            if df is None: # or len(df) < max(self.cfg.sma_slow,self.cfg.atr_len + self.cfg.atr_ma_len,) + 10:
                 raise RuntimeError("Not enough derived daily data for regime computation.")
 
             d = df.copy()

@@ -5,10 +5,12 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
-from datetime import datetime
+from threading import Lock
+from typing import Optional, List
+from datetime import date
 import pandas as pd
 import yfinance as yf
+
 
 from .config import DataConfig
 from .logging import log_kv
@@ -75,6 +77,25 @@ class YFDataLoader:
 
     def __post_init__(self) -> None:
         _safe_mkdir(self.cfg.cache_dir)
+        # Build a lightweight in-memory index of cached OHLCV files to avoid
+        # repeated os.listdir()+regex scans on every request.
+        self._cache_lock = Lock()
+        self._cache_index: dict[tuple[str, str], list[str]] = {}
+        if self.cfg.cache_dir and os.path.exists(self.cfg.cache_dir):
+            try:
+                for fn in os.listdir(self.cfg.cache_dir):
+                    if not fn.endswith(".parquet"):
+                        continue
+                    parts = fn.split("__")
+                    if len(parts) < 4:
+                        continue
+                    safe_ticker, interval_l = parts[0], parts[1]
+                    self._cache_index.setdefault((safe_ticker, interval_l), []).append(fn)
+                # Prefer newest files first
+                for k, files in self._cache_index.items():
+                    files.sort(key=lambda f: os.path.getmtime(os.path.join(self.cfg.cache_dir, f)), reverse=True)
+            except Exception:
+                self._cache_index = {}
 
     @staticmethod
     def _normalize_ohlcv(df: pd.DataFrame, ticker: str | None = None) -> pd.DataFrame:
@@ -120,14 +141,23 @@ class YFDataLoader:
 
             log_kv(logger,logging.INFO,"SEARCHING_CACHE",ticker=ticker)
 
-            for filename in os.listdir(self.cfg.cache_dir):
-                if re.search(pattern, filename):
-                    try:
-                        df = self._normalize_ohlcv(pd.read_parquet(os.path.join(self.cfg.cache_dir, filename)))
-                        log_kv(logger,logging.DEBUG,"DATA_CACHE_HIT",ticker=ticker,interval=interval_l,path=cache_path,rows=len(df),)
-                        return df
-                    except Exception as e:
-                        log_kv(logger,logging.WARNING,"DATA_CACHE_READ_FAIL",ticker=ticker,interval=interval_l,path=cache_path,err=str(e),)
+            # Fast path: consult in-memory cache index to avoid scanning the directory each call
+            with self._cache_lock:
+                candidates = list(self._cache_index.get((safe_ticker, interval_l), ()))
+
+            for filename in candidates:
+                try:
+                    df = self._normalize_ohlcv(pd.read_parquet(os.path.join(self.cfg.cache_dir, filename)))
+                    log_kv(logger, logging.DEBUG, "DATA_CACHE_HIT",
+                           ticker=ticker, interval=interval_l,
+                           path=os.path.join(self.cfg.cache_dir, filename),
+                           rows=len(df))
+                    return df
+                except Exception as e:
+                    log_kv(logger, logging.WARNING, "DATA_CACHE_READ_FAIL",
+                           ticker=ticker, interval=interval_l,
+                           path=os.path.join(self.cfg.cache_dir, filename),
+                           err=str(e))
 
 
         try:
@@ -152,27 +182,23 @@ class YFDataLoader:
             try:
                 df = self._normalize_ohlcv(df)
                 df.to_parquet(cache_path, index=True)
+                fn = os.path.basename(cache_path)
+                with self._cache_lock:
+                    key = (safe_ticker, interval_l)
+                    lst = self._cache_index.setdefault(key, [])
+                    if fn in lst:
+                        lst.remove(fn)
+                    lst.insert(0, fn)
             except Exception:
                 pass
 
         return df
 
-    def get_calendar(self, start: str | None, end: str | None) -> Optional[pd.DataFrame]:
+    def get_calendar(self, ticker: str, start: date, end: date) -> Optional[List[date]]:
         """
-        Return yfinance calendar data for a ticker as a DataFrame.
+        Return yfinance earnings dates for a ticker as a DatetimeIndex.
         """
-        try:
-            cal = yf.Calendars(start=start, end=end)
-            cal = cal.get_earnings_calendar(market_cap=10_000_000)
-            if cal is None:
-                return None
-            # yfinance may return Series or DataFrame depending on version
-            if isinstance(cal, pd.Series):
-                cal = cal.to_frame().T
-            if isinstance(cal, pd.DataFrame) and not cal.empty:
-                log_kv(logger, logging.DEBUG, "DATA_CALENDAR_SUCCESS", start=start, end=end)
-                return cal
-            return None
-        except Exception as e:
-            log_kv(logger, logging.DEBUG, "DATA_CALENDAR_FAIL", start=start, end=end, err=str(e))
-            return None
+        ticker = yf.Ticker(ticker)
+        df = ticker.get_earnings_dates(limit = 24)
+        index = pd.to_datetime(df.index).normalize() # index ist nicht kompatibel bei Vergleichen mit Datetime.date
+        return [date.date() for date in index[(index >= start) & (index <= end)].unique()]

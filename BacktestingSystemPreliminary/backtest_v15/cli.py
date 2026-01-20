@@ -61,47 +61,59 @@ def cmd_run(args):
     # build universe
     all_tickers = ub.read_tickers_file(args.tickers_file)
     all_tickers = list(dict.fromkeys([t.strip() for t in all_tickers if t.strip()]))
-    tickers = random.choices(all_tickers, k=args.sample)
+    tickers = random.sample(all_tickers, k=args.sample)
 
-    bars_4h ={}
-    daily = {}
-    accepted = []
+    tickers_pool = list(dict.fromkeys(all_tickers))
+    random.shuffle(tickers_pool)
+
+    accepted = set()
+    bars_4h, daily = {}, {}
     tested = 0
+    max_workers = 24
 
-    max_workers = 6
+    # Candidate stream: shuffled pool of unique tickers
+    candidates = iter(tickers_pool)
+
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
-        futures = {}
-        while len(accepted) < args.sample:
-            for t in tickers:
-                futures[ex.submit(_prepare_ticker, loader, aggregator, t, start, end, logger)] = t
+        in_flight = {}
 
-                if len(futures) >= max_workers * 3 and len(accepted) >= args.sample:
-                    break
+        # Prime the pool
+        while len(in_flight) < max_workers and len(accepted) < args.sample:
+            t = next(candidates, None)
+            if t is None:
+                break
+            in_flight[ex.submit(_prepare_ticker, loader, aggregator, t, start, end, logger)] = t
 
-                for fut in as_completed(futures):
-                    t = futures[fut]
-                    tested += 1
-                    ticker, d1h, b4, d1 = fut.result()
+        # Consume results; for each completed task, optionally enqueue one more.
+        while in_flight and len(accepted) < args.sample:
+            for fut in as_completed(in_flight):
+                t = in_flight.pop(fut)
+                tested += 1
 
-                    if b4 is None or d1 is None:
-                        continue
-
+                ticker, d1h, b4, d1 = fut.result()
+                if b4 is not None and d1 is not None:
                     if ub._passes_hygiene(ticker=ticker, oneh=d1h, daily=d1):
-                        accepted.append(t)
+                        accepted.add(t)
                         bars_4h[t] = b4
                         daily[t] = d1
 
-                    if len(accepted) >= args.sample:
-                        break
-                if len(accepted) >= args.sample:
-                    tickers.append(random.choice(all_tickers))
+                # Keep the pool filled until we have enough accepted tickers.
+                if len(accepted) < args.sample:
+                    nxt = next(candidates, None)
+                    if nxt is not None:
+                        in_flight[ex.submit(_prepare_ticker, loader, aggregator, nxt, start, end, logger)] = nxt
 
-    # get earnings
-    cal = loader.get_calendar(start=start, end=end)
+                # Break so the outer while can re-check stop conditions.
+                break
+
+        # Optional: if we reached the sample early, try to cancel not-yet-started futures.
+        for fut in list(in_flight):
+            fut.cancel()
+
 
     # run backtest
     bt = Backtester(loader, acfg, scfg, slip, rcfg, regcfg)
-    pf = bt.run(bars_4h=bars_4h, daily=daily, cal = cal, params=BacktestParams(start=start, end=end, initial_equity=args.initial_equity))
+    pf = bt.run(bars_4h=bars_4h, daily=daily, params=BacktestParams(start=start, end=end, initial_equity=args.initial_equity))
 
     params = {
         "start": start,
