@@ -78,7 +78,7 @@ class Backtester:
                 else:
                     sig = self.strategy.evaluate(
                         df, i, feat,
-                        cat=self.catalyst.get_earnings_catalyst(t, daily.get(t, pd.DataFrame()), current_ts=ts, cal=self.loader.get_calendar(ticker=t, start=params.start, end=params.end)),
+                        cat=self.catalyst.get_earnings_catalyst(t, daily.get(t, pd.DataFrame()), current_ts=ts.tz_convert(None), cal=self.loader.get_calendar(ticker=t, start=params.start, end=params.end)),
                         in_position=True
                     )
                     if sig.type == SignalType.EXIT:
@@ -100,7 +100,7 @@ class Backtester:
                 feat = self.feats.snapshot(df, i)
 
                 dd = daily.get(t)
-                cat = self.catalyst.get_earnings_catalyst(t, dd, current_ts=ts, cal = self.loader.get_calendar(ticker=t, start=params.start, end=params.end))
+                cat = self.catalyst.get_earnings_catalyst(ticker=t, current_ts=ts.tz_convert(None), cal = self.loader.get_calendar(ticker=t, start=params.start, end=params.end))
 
                 sig = self.strategy.evaluate(df, i, feat, cat, in_position=False)
                 if sig.type != SignalType.ENTRY:

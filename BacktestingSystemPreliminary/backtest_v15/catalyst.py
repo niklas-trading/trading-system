@@ -19,25 +19,21 @@ class CatalystInfo:
 class CatalystEngine:
     loader: YFDataLoader
 
-    def get_earnings_catalyst(self, ticker: str, current_ts: pd.Timestamp, cal: List[pd.Datetime.date]) -> CatalystInfo:
-        log_kv(logger, logging.DEBUG, "CATALYST_CHECK", ticker=ticker, asof=str(current_ts.date()) if hasattr(current_ts, 'date') else str(current_ts), max_age_days=max_age_days)
+    def get_earnings_catalyst(self, ticker: str, current_ts: pd.Timestamp, cal: List[pd.Timestamp]) -> CatalystInfo:
+        log_kv(logger, logging.DEBUG, "CATALYST_CHECK", ticker=ticker, asof=str(current_ts.date()) if hasattr(current_ts, 'date') else str(current_ts))
         """Uses yfinance calendar as a catalyst proxy (earnings date).
 
         Classification K1/K2 uses a simplified daily reaction check.
 
         """
-        if daily is None or daily.empty:
-            log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_DAILY_BARS")
-            return CatalystInfo(False, "NONE", None)
-        if cal is None or cal.isEmpty():
+        if cal is None or len(cal) == 0:
             log_kv(logger, logging.DEBUG, "CATALYST_NONE", ticker=ticker, reason="NO_CALENDAR")
             return CatalystInfo(False, "NONE", None)
 
-        current_date = pd.Timestamp(current_ts).tz_localize(None).normalize()
         for earnings_date in cal:
-            if earnings_date > current_date:
+            if earnings_date > current_ts:
                 break
-            if earnings_date <= current_date <= earnings_date + pd.Timedelta(days=14):
+            if earnings_date <= current_ts <= earnings_date + pd.Timedelta(days=14):
                 return CatalystInfo(True, "K1", earnings_date)
         return CatalystInfo(False, "NONE", None)
 

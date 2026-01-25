@@ -194,11 +194,14 @@ class YFDataLoader:
 
         return df
 
-    def get_calendar(self, ticker: str, start: date, end: date) -> Optional[List[date]]:
+    def get_calendar(self, ticker: str, start: date, end: date) -> List[pd.Timestamp]:
         """
         Return yfinance earnings dates for a ticker as a DatetimeIndex.
         """
         ticker = yf.Ticker(ticker)
         df = ticker.get_earnings_dates(limit = 24)
-        index = pd.to_datetime(df.index).normalize() # index ist nicht kompatibel bei Vergleichen mit Datetime.date
-        return [date.date() for date in index[(index >= start) & (index <= end)].unique()]
+        if df is None or df.empty:
+            return []
+        index = pd.to_datetime(df.index).tz_convert(None).normalize()
+        log_kv(logger,logging.DEBUG,"CALENDAR_FOUND",ticker=ticker,start=start, end= end)
+        return [pd.Timestamp(date.date()) for date in index[(index >= pd.Timestamp(start)) & (index <= pd.Timestamp(end))].unique()]
