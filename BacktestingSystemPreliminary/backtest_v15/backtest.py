@@ -45,7 +45,7 @@ class Backtester:
         self.risk = RiskEngine(risk_cfg)
         self.regime_engine = RegimeEngine(regime_cfg, loader)
 
-    def run(self, bars_4h: dict[str, pd.DataFrame], daily: dict[str, pd.DataFrame], params: BacktestParams, show_progress: bool = True) -> Portfolio:
+    def run(self, bars_4h: dict[str, pd.DataFrame], daily: dict[str, pd.DataFrame], params: BacktestParams) -> Portfolio:
         log_kv(logger, logging.INFO, "BACKTEST_START", tickers=len(bars_4h), start=params.start, end=params.end)
         # regime feed (daily), later mapped to intraday timestamps
         regime_daily_for_ticker: dict[str, Series] = self.regime_engine.compute_weekly_regime(daily=daily)
@@ -55,12 +55,12 @@ class Backtester:
         all_ts = sorted(set().union(*[set(df.index) for df in bars_4h.values()]))
         portfolio = Portfolio(equity=params.initial_equity, equity_high=params.initial_equity)
 
-        next_i = {t: 0 for t in bars_4h}
+        next_i = dict.fromkeys(bars_4h, 0)
 
         # main loop
         for ts in all_ts:
             # 1) exits first
-            for t, pos in list(portfolio.positions.items()):
+            for t, pos in portfolio.positions.items():
                 df = bars_4h.get(t)
                 i = next_i.get(t, 0)
                 if df is None or i >= len(df) or df.index[i] != ts:
@@ -85,7 +85,6 @@ class Backtester:
                         exit_px = self.slip.apply(close, feat.atr, side="sell")
                         portfolio.close_position(t, ts, exit_px, reason="TREND_BREAK")
                         log_kv(logger, logging.INFO, "TREND_BREAK", ticker=t)
-                    exited = True
 
                 next_i[t] = i + 1
 
@@ -99,7 +98,6 @@ class Backtester:
 
                 feat = self.feats.snapshot(df, i)
 
-                dd = daily.get(t)
                 cat = self.catalyst.get_earnings_catalyst(ticker=t, current_ts=ts.tz_convert(None), cal = self.loader.get_calendar(ticker=t, start=params.start, end=params.end))
 
                 sig = self.strategy.evaluate(df, i, feat, cat, in_position=False)
@@ -149,8 +147,7 @@ class Backtester:
                 next_i[t] = i + 1
 
         # close remaining at last available close
-        last_ts = all_ts[-1]
-        for t, pos in list(portfolio.positions.items()):
+        for t, pos in portfolio.positions.items():
             df = bars_4h.get(t)
             if df is None:
                 continue

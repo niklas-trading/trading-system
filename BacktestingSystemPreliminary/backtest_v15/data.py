@@ -37,7 +37,7 @@ def _load_any_cached_ohlcv(cache_dir: str) -> Optional[pd.DataFrame]:
             continue
         try:
             df = pd.read_parquet(os.path.join(cache_dir, fname))
-            if df is not None and len(df) > 0:
+            if len(df) > 0:
                 return df
         except Exception:
             continue
@@ -100,7 +100,6 @@ class YFDataLoader:
     @staticmethod
     def _normalize_ohlcv(df: pd.DataFrame, ticker: str | None = None) -> pd.DataFrame:
         if isinstance(df.columns, pd.MultiIndex):
-            levels = df.columns.names
             # robust: versuche in letzter Ebene den ticker zu finden
             if ticker in df.columns.get_level_values(-1):
                 df = df.xs(ticker, axis=1, level=-1, drop_level=True)
@@ -115,7 +114,7 @@ class YFDataLoader:
         df.index = pd.to_datetime(df.index)
         return df
 
-    def get_ohlcv(self, ticker: str, start: str | None, end: str | None, interval: str = "1d",lookback_days: int | None = None,) -> pd.DataFrame | None:
+    def get_ohlcv(self, ticker: str, start: str | None, end: str | None, interval: str = "1d") -> pd.DataFrame | None:
         """
         Fetch OHLCV data via yfinance with disk caching.
         """
