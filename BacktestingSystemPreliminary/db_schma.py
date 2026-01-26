@@ -1,5 +1,4 @@
 import psycopg
-import pyarrow.parquet as pq
 
 with psycopg.connect("dbname=backtest_data user=postgres") as conn:
     with conn.cursor() as cursor:
@@ -37,7 +36,7 @@ with psycopg.connect("dbname=backtest_data user=postgres") as conn:
                               close    double precision NULL,
                               volume   double precision NULL,
 
-                              PRIMARY KEY (Datetime, ticker)
+                              PRIMARY KEY (datetime, ticker)
                           );
         """)
         cursor.execute("""SELECT create_hypertable
